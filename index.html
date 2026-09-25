@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FOMO Quant Screen v0.2</title>
+<style>
+:root{--bg:#03111b;--panel:#061b29;--panel2:#082334;--line:#0b4660;--cyan:#00d9ff;--green:#28e79b;--amber:#ffbd3e;--red:#ff5665;--txt:#eaf7ff;--muted:#86a8bb}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 45% 0,#08304a 0,#03111b 32%,#020b12 100%);color:var(--txt);font:14px Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+header{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 22px;background:#03101ae8;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}
+.logo{width:38px;height:38px;border:7px solid var(--cyan);transform:rotate(30deg);border-radius:7px;box-shadow:0 0 22px #00d9ff55}.brand{font-size:20px;font-weight:900;letter-spacing:.4px}.sub{font-size:12px;color:#9ac1d5;margin-top:2px}
+.tabs{display:flex;gap:8px;margin-left:28px}.tab{padding:12px 22px;border:1px solid #14506c;border-radius:7px;color:#a9c9d8;font-weight:800}.tab.on{color:white;border-color:var(--cyan);box-shadow:0 0 14px #00d9ff55 inset,0 0 10px #00d9ff22}
+.live{margin-left:auto;padding:7px 12px;border:1px solid #0b604c;border-radius:8px;color:var(--green);font-weight:800}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:7px}
+.wrap{display:grid;grid-template-columns:270px 1fr;gap:12px;padding:12px}.panel{background:linear-gradient(180deg,#071d2bfa,#041722fa);border:1px solid #0b4057;border-radius:10px;box-shadow:0 12px 40px #0004}
+aside{padding:15px;height:calc(100vh - 92px);position:sticky;top:80px;overflow:auto}.h{font-weight:900;font-size:16px;letter-spacing:.4px}.cyan{color:var(--cyan)}.small{font-size:11px;color:var(--muted)}
+label{display:block;margin:15px 0 6px;font-weight:800}.input,select,button{width:100%;background:#062337;border:1px solid #15506b;color:var(--txt);border-radius:7px;padding:10px}button{cursor:pointer;font-weight:900}button.primary{border-color:var(--cyan);background:linear-gradient(180deg,#0c5c77,#07354b);box-shadow:0 0 15px #00d9ff22}button:hover{filter:brightness(1.12)}
+.row{display:flex;gap:8px}.row>*{flex:1}.status{padding:7px 9px;border-radius:6px;background:#05131d;border:1px solid #15384a;margin-top:8px;font-size:11px}.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+main{display:flex;flex-direction:column;gap:12px}.hero{padding:14px 16px;display:flex;align-items:center}.hero h1{font-size:22px;margin:0}.hero p{margin:3px 0 0;color:#a9c6d6}.badge{margin-left:auto;border:1px solid #0b526d;border-radius:8px;padding:10px 14px;color:#8fdff1}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.card{padding:13px 14px}.k{font-size:11px;color:#a7c2d0}.v{font-size:24px;font-weight:900;margin-top:5px}.delta{font-size:10px;color:var(--green)}
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:12px}.section{padding:14px}.sectiontitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.sectiontitle b{font-size:15px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px 8px;border-bottom:1px solid #10374a;text-align:left;font-size:12px}th{color:#8eafc0;font-weight:700}.num{text-align:right}.pill{font-size:10px;font-weight:900;padding:4px 7px;border-radius:5px;border:1px solid currentColor;display:inline-block}.PASS{color:var(--green)}.WATCH{color:#39bfff}.REVIEW{color:var(--amber)}.REJECT{color:var(--red)}.MISSING{color:#899da7}
+.chart{height:330px;position:relative;border:1px solid #0d3a50;border-radius:7px;background:linear-gradient(#0b2a3a33 1px,transparent 1px),linear-gradient(90deg,#0b2a3a33 1px,transparent 1px);background-size:20% 20%;overflow:hidden}
+.chart svg{width:100%;height:100%}.legend{position:absolute;right:12px;top:10px;font-size:11px;color:#8eb1c2}
+.paper{display:grid;grid-template-columns:1.2fr 1fr;gap:12px}.meter{height:9px;background:#07131b;border:1px solid #164153;border-radius:8px;overflow:hidden;margin-top:8px}.meter>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--green))}
+.log{max-height:230px;overflow:auto}.event{display:grid;grid-template-columns:58px 1fr auto;gap:8px;padding:9px 0;border-bottom:1px solid #10374a}.footer{padding:10px 14px;color:#6f96a8;font-size:10px}
+.modal{display:none;position:fixed;inset:0;background:#000a;z-index:10;align-items:center;justify-content:center}.modal.on{display:flex}.box{width:min(760px,92vw);max-height:85vh;overflow:auto;padding:18px}.analysis{white-space:pre-wrap;line-height:1.55;color:#cfe8f3}
+@media(max-width:1050px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto}.cards{grid-template-columns:repeat(2,1fr)}.grid,.paper{grid-template-columns:1fr}.tabs{display:none}}
+</style>
+</head>
+<body>
+<header><div class="logo"></div><div><div class="brand">FOMO QUANT SCREEN</div><div class="sub">Copyability Intelligence · Risk Filtering · PAPER 50</div></div>
+<div class="tabs"><div class="tab on">FOMO</div><div class="tab">TRADERS</div><div class="tab" id="paperTab">PAPER 50</div><div class="tab" id="calTab">CALIBRATION</div></div>
+<div class="live"><span class="dot"></span><span id="liveTxt">READY</span></div></header>
+
+<div class="wrap">
+<aside class="panel">
+<div class="h cyan">DATA & FILTERS</div>
+<label>Token / contract search</label><input id="q" class="input" placeholder="SOL, AXON or contract"/>
+<div class="row" style="margin-top:8px"><select id="chain"><option value="">All chains</option><option value="solana">Solana</option><option value="ethereum">Ethereum</option><option value="base">Base</option><option value="bsc">BSC</option></select><button id="searchBtn" class="primary">SCAN</button></div>
+<label>Min liquidity USD</label><input id="minLiq" class="input" type="number" value="50000"/>
+<label>Min 24h volume USD</label><input id="minVol" class="input" type="number" value="100000"/>
+<label>Max risk score</label><input id="maxRisk" class="input" type="number" value="70" min="0" max="100"/>
+<hr style="border:0;border-top:1px solid #123a4c;margin:18px 0">
+<div class="h">API CONNECTIONS</div>
+<div id="dexStatus" class="status">DEX Screener · not tested</div>
+<label>CoinGecko Demo API key</label><input id="cgKey" class="input" type="password" placeholder="Optional key"/>
+<div id="cgStatus" class="status">CoinGecko · not tested</div>
+<label>Gemini API key</label><input id="gemKey" class="input" type="password" placeholder="Session only — never saved"/>
+<label>Gemini model</label><input id="gemModel" class="input" value="gemini-3.8-flash"/>
+<div id="gemStatus" class="status">Gemini · not tested</div>
+<button id="testBtn" style="margin-top:10px">TEST CONNECTIONS</button>
+<p class="small">Gemini key is kept in memory only and is cleared on refresh. For public deployment, use a private backend proxy instead of a browser key.</p>
+<hr style="border:0;border-top:1px solid #123a4c;margin:18px 0">
+<div class="h">FOMO COMPLIANCE</div>
+<div class="status ok">✓ No FOMO scraping</div><div class="status ok">✓ No automated FOMO account control</div><div class="status ok">✓ No automated trades</div>
+<p class="small">FOMO trader signals must be entered/imported from a permitted source. This screen uses external market-data APIs for research and paper testing.</p>
+</aside>
+
+<main>
+<section class="panel hero"><div><h1>FOMO Quant Screen <span class="cyan">v0.1</span></h1><p>DON'T COPY PROFITS. TEST COPYABILITY.</p></div><div class="badge">🔒 LIVE CAPITAL LOCKED · PAPER TEST ONLY</div></section>
+<div class="cards">
+<div class="panel card"><div class="k">Pairs scanned</div><div class="v" id="scanned">0</div><div class="delta">DEX Screener</div></div>
+<div class="panel card"><div class="k">Risk pass</div><div class="v" id="passed">0</div><div class="delta">rules-based</div></div>
+<div class="panel card"><div class="k">Early signals</div><div class="v" id="early">0</div><div class="delta">market-data only</div></div>
+<div class="panel card"><div class="k">Investigate</div><div class="v" id="investigate">0</div><div class="delta">top candidates</div></div>
+<div class="panel card"><div class="k">PAPER 50</div><div class="v"><span id="paperN">0</span>/50</div><div class="delta">live locked</div></div>
+</div>
+
+<div class="grid">
+<section class="panel section"><div class="sectiontitle"><b>OPPORTUNITY MAP</b><span class="small">Signal strength × 24h volume acceleration</span></div><div class="chart"><svg id="scatter" viewBox="0 0 800 330"></svg><div class="legend">● candidate &nbsp; ○ risk pass</div></div></section>
+<section class="panel section"><div class="sectiontitle"><b>TOP CANDIDATES</b><span class="small" id="sync">Not synced</span></div>
+<table><thead><tr><th>Token</th><th class="num">Signal</th><th class="num">Risk</th><th class="num">Liquidity</th><th>Status</th><th>Action</th></tr></thead><tbody id="tbody"><tr><td colspan="6" class="small">Run SCAN to load live market data.</td></tr></tbody></table></section>
+</div>
+
+<div class="paper">
+<section class="panel section">
+<div class="sectiontitle"><b>ACTIVE PAPER WATCH</b><span class="pill WATCH">LIVE CAPITAL LOCKED</span></div>
+<div class="row"><div><div class="k">Active</div><div class="v" id="activeN">0</div></div><div><div class="k">Completed</div><div class="v" id="completedN">0</div></div><div><div class="k">Net PNL</div><div class="v" id="pPnl">$0.00</div></div><div><div class="k">PAPER 50</div><div class="v"><span id="paperN">0</span>/50</div></div></div>
+<div class="meter"><i id="meter"></i></div>
+<div style="overflow:auto;margin-top:12px"><table><thead><tr><th>ID</th><th>Token</th><th>Direction</th><th>Entry</th><th>Now</th><th>PNL</th><th>Age</th><th>Next</th><th>Status</th></tr></thead><tbody id="watchBody"><tr><td colspan="9" class="small">No active paper tests.</td></tr></tbody></table></div>
+<div class="row" style="margin-top:12px"><button id="refreshWatch" class="primary">REFRESH PAPER WATCH</button><button id="importBtn">IMPORT PAPER JSON</button><button id="exportBtn">EXPORT FULL LOG</button><input id="file" type="file" accept=".json" hidden></div>
+</section>
+<section class="panel section"><div class="sectiontitle"><b>RISK / DATA ALERTS</b><span class="small">immutable evidence first</span></div><div id="alerts" class="log"><div class="event"><span>NOW</span><span>Waiting for live scan.</span><span class="pill WATCH">INFO</span></div></div></section>
+</div>
+
+<section class="panel section" id="calibrationLab">
+<div class="sectiontitle"><b>CALIBRATION LAB + PREDICTION LEDGER</b><span class="small">OBSERVE → PREDICT → FREEZE → WATCH → SCORE → CALIBRATE</span></div>
+<div class="cards" style="grid-template-columns:repeat(6,1fr);margin-bottom:12px">
+<div class="panel card"><div class="k">Predictions</div><div class="v" id="predN">0</div></div>
+<div class="panel card"><div class="k">LONG</div><div class="v" id="longN">0</div></div>
+<div class="panel card"><div class="k">SHORT</div><div class="v" id="shortN">0</div></div>
+<div class="panel card"><div class="k">No Trade</div><div class="v" id="noTradeN">0</div></div>
+<div class="panel card"><div class="k">30m Scored</div><div class="v" id="scored30">0</div></div>
+<div class="panel card"><div class="k">30m Hit Rate</div><div class="v" id="hit30">—</div></div>
+</div>
+<div style="overflow:auto"><table><thead><tr><th>ID</th><th>Time</th><th>Token</th><th>Direction</th><th>Confidence</th><th>Horizon</th><th>Signal</th><th>Risk</th><th>Liquidity</th><th>30m</th><th>Result</th></tr></thead><tbody id="ledgerBody"><tr><td colspan="11" class="small">No frozen predictions yet. Start a paper test from a candidate.</td></tr></tbody></table></div>
+<div class="small" style="margin-top:10px">Calibration uses every completed observation, including losses and NO TRADE decisions. Raw v0.1 signal/risk scores remain unchanged until the dataset is large enough to justify recalibration.</div>
+</section>
+<div class="panel footer">FOMO Quant Screen v0.2 · Research + paper testing only · Missing data is shown as missing, never invented · External data may be delayed or incomplete.</div>
+</main></div>
+
+<div class="modal" id="modal"><div class="panel box"><div class="sectiontitle"><b id="modalTitle">INVESTIGATION</b><button id="close" style="width:auto">CLOSE</button></div><div id="modalBody" class="analysis"></div></div></div>
+
+<script>
+const $=id=>document.getElementById(id); let pairs=[], gemKey="";
+const STORE="fomo_qs_v02_state";
+let state={paperTests:[],predictions:[],seq:1};
+try{state={...state,...JSON.parse(localStorage.getItem(STORE)||"{}")}}catch(e){}
+function saveState(){localStorage.setItem(STORE,JSON.stringify(state))}
+const checkpoints=[5,15,30,60,360,1440];
+function testId(){let id="FOMO-P"+String(state.seq||1).padStart(3,"0");state.seq=(state.seq||1)+1;return id}
+function ageMin(t){return Math.max(0,(Date.now()-new Date(t).getTime())/60000)}
+function nextCheckpoint(t){let a=ageMin(t);return checkpoints.find(x=>x>a)||null}
+function pct(dir,entry,now){if(!entry||!now)return null;return dir==="SHORT"?(entry/now-1)*100:(now/entry-1)*100}
+
+const fmt=n=>n==null||!isFinite(n)?"—":n>=1e9?"$"+(n/1e9).toFixed(1)+"B":n>=1e6?"$"+(n/1e6).toFixed(1)+"M":n>=1e3?"$"+(n/1e3).toFixed(0)+"K":"$"+Number(n).toFixed(0);
+function risk(p){let r=0,L=p.liquidity?.usd||0,V=p.volume?.h24||0,mc=p.marketCap||p.fdv||0,age=p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/864e5:null;
+ if(L<25000)r+=35; else if(L<50000)r+=25; else if(L<100000)r+=15; else r+=5;
+ if(V<50000)r+=20; else if(V<100000)r+=12; else r+=4;
+ if(mc&&L/mc<.02)r+=18; else if(mc&&L/mc<.05)r+=10;
+ if(age!=null&&age<1)r+=18; else if(age!=null&&age<7)r+=8;
+ if(Math.abs(p.priceChange?.h24||0)>80)r+=10;
+ return Math.min(100,r)}
+function signal(p){let V=p.volume?.h24||0,L=p.liquidity?.usd||0,b=p.txns?.h24?.buys||0,s=p.txns?.h24?.sells||0,pc=p.priceChange?.h24||0;
+ let x=20+Math.min(25,Math.log10(Math.max(V,1))*4)+Math.min(20,(V/Math.max(L,1))*5)+Math.min(15,Math.max(0,pc)/4)+Math.min(15,Math.max(0,(b-s))/Math.max(1,b+s)*30);return Math.max(0,Math.min(100,Math.round(x)))}
+function enrich(p){return {...p,_risk:risk(p),_signal:signal(p)}}
+function filt(){let c=$("chain").value,minL=+$("minLiq").value,minV=+$("minVol").value,maxR=+$("maxRisk").value;return pairs.filter(p=>(!c||p.chainId===c)&&(p.liquidity?.usd||0)>=minL&&(p.volume?.h24||0)>=minV&&p._risk<=maxR).sort((a,b)=>b._signal-a._signal)}
+async function scan(){
+ $("liveTxt").textContent="SCANNING"; $("dexStatus").textContent="DEX Screener · connecting…";
+ try{
+  let q=$("q").value.trim(), url=q?`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`:`https://api.dexscreener.com/token-boosts/top/v1`;
+  let r=await fetch(url); if(!r.ok)throw Error("HTTP "+r.status); let d=await r.json();
+  if(q){pairs=(d.pairs||[]).map(enrich)}
+  else{
+   let boosts=Array.isArray(d)?d.slice(0,30):[]; let groups={}; boosts.forEach(x=>(groups[x.chainId]??=[]).push(x.tokenAddress));
+   let calls=Object.entries(groups).slice(0,5).map(([ch,aa])=>fetch(`https://api.dexscreener.com/tokens/v1/${ch}/${aa.slice(0,30).join(",")}`).then(x=>x.json()));
+   let rr=await Promise.all(calls); pairs=rr.flat().map(enrich)
+  }
+  $("dexStatus").innerHTML='<span class="ok">● DEX Screener · CONNECTED</span>'; render(); addAlert(`Live scan loaded ${pairs.length} pairs.`,"PASS")
+ }catch(e){$("dexStatus").innerHTML=`<span class="bad">● DEX Screener · ${e.message}</span>`; addAlert("DEX Screener failed: "+e.message,"REJECT")}
+ $("liveTxt").textContent="LIVE DATA";
+}
+function render(){
+ let a=filt(); $("scanned").textContent=pairs.length; $("passed").textContent=a.length; $("early").textContent=a.filter(x=>x._signal>=65).length;$("investigate").textContent=Math.min(12,a.length);$("sync").textContent=new Date().toLocaleTimeString();
+ $("tbody").innerHTML=a.slice(0,10).map((p,i)=>`<tr data-i="${pairs.indexOf(p)}"><td><b>${p.baseToken?.symbol||"?"}</b><div class="small">${p.chainId||"?"} · ${p.dexId||"?"}</div></td><td class="num">${p._signal}</td><td class="num">${p._risk}</td><td class="num">${fmt(p.liquidity?.usd)}</td><td><span class="pill ${p._risk<=35?"PASS":p._risk<=60?"WATCH":"REVIEW"}">${p._risk<=35?"PASS":p._risk<=60?"WATCH":"REVIEW"}</span></td><td><button class="paperStart" data-i="${pairs.indexOf(p)}" style="padding:5px 7px">PAPER</button></td></tr>`).join("")||'<tr><td colspan="6" class="small">No candidates pass current filters.</td></tr>';
+ [...$("tbody").querySelectorAll("tr[data-i]")].forEach(tr=>tr.onclick=e=>{if(!e.target.classList.contains("paperStart"))investigate(pairs[+tr.dataset.i])});
+ [...document.querySelectorAll(".paperStart")].forEach(b=>b.onclick=e=>{e.stopPropagation();startPaper(pairs[+b.dataset.i])});
+ draw(a.slice(0,80))
+}
+function draw(a){let s=$("scatter");s.innerHTML='<line x1="50" y1="285" x2="775" y2="285" stroke="#2a5b70"/><line x1="50" y1="20" x2="50" y2="285" stroke="#2a5b70"/>';
+ a.forEach(p=>{let x=50+p._signal*7.1,y=285-Math.min(250,Math.log10(Math.max(p.volume?.h24||1,1))*34),good=p._risk<=35;s.innerHTML+=`<circle cx="${x}" cy="${y}" r="${good?6:4}" fill="${good?"#28e79b":"#00aee8"}" opacity=".85"><title>${p.baseToken?.symbol} signal ${p._signal} risk ${p._risk}</title></circle>`})
+}
+function addAlert(msg,sev="WATCH"){$("alerts").insertAdjacentHTML("afterbegin",`<div class="event"><span>${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span><span>${msg}</span><span class="pill ${sev}">${sev}</span></div>`)}
+async function testConnections(){
+ await scan();
+ let cg=$("cgKey").value.trim(); try{let u="https://api.coingecko.com/api/v3/ping",opt={};if(cg){u="https://api.coingecko.com/api/v3/ping";opt.headers={"x-cg-demo-api-key":cg}}let r=await fetch(u,opt);if(!r.ok)throw Error("HTTP "+r.status);$("cgStatus").innerHTML='<span class="ok">● CoinGecko · CONNECTED</span>'}catch(e){$("cgStatus").innerHTML=`<span class="warn">● CoinGecko · ${e.message}</span>`}
+ gemKey=$("gemKey").value.trim(); if(!gemKey){$("gemStatus").innerHTML='<span class="warn">● Gemini · key not entered</span>';return}
+ try{let model=$("gemModel").value.trim();let r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":gemKey},body:JSON.stringify({contents:[{parts:[{text:"Reply only: FOMO_QUANT_OK"}]}],generationConfig:{maxOutputTokens:20}})});if(!r.ok)throw Error("HTTP "+r.status);let d=await r.json();$("gemStatus").innerHTML='<span class="ok">● Gemini · CONNECTED</span>'}catch(e){$("gemStatus").innerHTML=`<span class="bad">● Gemini · ${e.message}</span>`}
+}
+async function investigate(p){
+ $("modal").classList.add("on");$("modalTitle").textContent=`INVESTIGATE · ${p.baseToken?.symbol||"TOKEN"}`;
+ let raw=`Token: ${p.baseToken?.name} (${p.baseToken?.symbol})
+Chain / DEX: ${p.chainId} / ${p.dexId}
+Contract: ${p.baseToken?.address}
+Price: ${p.priceUsd||"N/A"}
+Liquidity: ${fmt(p.liquidity?.usd)}
+24h Volume: ${fmt(p.volume?.h24)}
+Market Cap/FDV: ${fmt(p.marketCap||p.fdv)}
+24h Change: ${p.priceChange?.h24 ?? "N/A"}%
+24h Buys/Sells: ${p.txns?.h24?.buys ?? "N/A"} / ${p.txns?.h24?.sells ?? "N/A"}
+Rules Signal: ${p._signal}/100
+Rules Risk: ${p._risk}/100
+
+Decision: MARKET-DATA REVIEW ONLY
+FOMO trader quality: INSUFFICIENT DATA
+Copyability: INSUFFICIENT DATA
+Execution delay/slippage: INSUFFICIENT DATA`;
+ $("modalBody").textContent=raw+"\n\nGemini: "+(gemKey?"analyzing…":"key not connected — rules-only view.");
+ if(gemKey)try{
+  let prompt=`You are the analysis layer of a PAPER-TEST-ONLY FOMO copyability research tool. Never invent missing data. Analyze the snapshot below. Return concise sections: Evidence, Token Risk, Execution Risk, Missing Data, Decision (ALLOW PAPER/WATCH/REJECT/INSUFFICIENT DATA). A good token never overrides missing trader/copyability evidence.\n\n${raw}`;
+  let model=$("gemModel").value.trim();let r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":gemKey},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.15,maxOutputTokens:900}})});let d=await r.json();let t=d.candidates?.[0]?.content?.parts?.map(x=>x.text||"").join("")||JSON.stringify(d);$("modalBody").textContent=raw+"\n\nGEMINI ANALYSIS\n"+t
+ }catch(e){$("modalBody").textContent=raw+"\n\nGemini error: "+e.message}
+}
+
+function chooseDirection(p){
+ let dir="NO TRADE",conf=50,reasons=[];
+ if(p._risk>60){dir="NO TRADE";conf=75;reasons.push("Risk score above paper threshold")}
+ else if(p._signal>=75 && (p.priceChange?.h24||0)>=0){dir="LONG";conf=Math.min(80,52+Math.round((p._signal-65)*.7));reasons.push("High raw signal","Positive/neutral 24h momentum")}
+ else if(p._signal>=65 && (p.priceChange?.h24||0)<-10){dir="SHORT";conf=Math.min(75,50+Math.round((p._signal-60)*.6));reasons.push("Signal activity with negative 24h momentum")}
+ else {reasons.push("Setup does not clear directional calibration gate")}
+ return {dir,conf,reasons}
+}
+function startPaper(p){
+ if(!p.priceUsd){addAlert("Cannot start paper test: price missing.","REJECT");return}
+ let pr=chooseDirection(p), now=new Date().toISOString(), id=testId();
+ let frozen={id,time:now,token:p.baseToken?.symbol||"?",name:p.baseToken?.name||"",chain:p.chainId,address:p.baseToken?.address,pairAddress:p.pairAddress,
+  direction:pr.dir,confidence:pr.conf,horizon:"30m",reasons:pr.reasons,entry:Number(p.priceUsd),signal:p._signal,risk:p._risk,
+  liquidity:p.liquidity?.usd??null,volume24:p.volume?.h24??null,buys24:p.txns?.h24?.buys??null,sells24:p.txns?.h24?.sells??null,
+  priceChange24:p.priceChange?.h24??null,sourceUrl:p.url||null};
+ state.predictions.push(frozen);
+ if(pr.dir!=="NO TRADE")state.paperTests.push({...frozen,status:"ACTIVE",observations:[{checkpoint:"T0",time:now,price:Number(p.priceUsd),liquidity:p.liquidity?.usd??null,volume24:p.volume?.h24??null}]});
+ saveState();renderPaper();addAlert(`${id} frozen: ${frozen.token} ${pr.dir} @ ${frozen.entry}`,"PASS")
+}
+async function fetchPair(t){
+ if(!t.chain||!t.pairAddress)return null;
+ let r=await fetch(`https://api.dexscreener.com/latest/dex/pairs/${t.chain}/${t.pairAddress}`); if(!r.ok)throw Error("HTTP "+r.status);
+ let d=await r.json();return d.pair||(d.pairs&&d.pairs[0])||null
+}
+async function refreshPaperWatch(){
+ let active=state.paperTests.filter(t=>t.status==="ACTIVE"); if(!active.length){addAlert("No active paper tests to refresh.","WATCH");return}
+ for(let t of active)try{
+   let p=await fetchPair(t); if(!p||!p.priceUsd)continue;
+   let a=ageMin(t.time), due=checkpoints.filter(c=>a>=c && !t.observations.some(o=>o.checkpoint===c+"m"));
+   t.lastPrice=Number(p.priceUsd);t.lastTime=new Date().toISOString();t.lastLiquidity=p.liquidity?.usd??null;
+   for(let c of due)t.observations.push({checkpoint:c+"m",minutes:c,time:t.lastTime,price:t.lastPrice,liquidity:p.liquidity?.usd??null,volume24:p.volume?.h24??null});
+   if(a>=1440){t.status="COMPLETED";t.exitPrice=t.lastPrice;t.completedAt=t.lastTime}
+ }catch(e){addAlert(`${t.id} refresh failed: ${e.message}`,"REJECT")}
+ saveState();renderPaper();addAlert(`Paper Watch refreshed ${active.length} active test(s).`,"PASS")
+}
+function obsAt(t,min){return t.observations?.find(o=>o.minutes===min)}
+function renderPaper(){
+ let tests=state.paperTests,active=tests.filter(t=>t.status==="ACTIVE"),done=tests.filter(t=>t.status==="COMPLETED");
+ $("paperN").textContent=tests.length;$("activeN").textContent=active.length;$("completedN").textContent=done.length;$("meter").style.width=Math.min(100,tests.length/50*100)+"%";
+ let net=tests.reduce((z,t)=>z+(pct(t.direction,t.entry,t.exitPrice||t.lastPrice||t.entry)||0),0);$("pPnl").textContent=net.toFixed(2)+"%";
+ $("watchBody").innerHTML=active.map(t=>{let n=t.lastPrice||t.entry,r=pct(t.direction,t.entry,n),nx=nextCheckpoint(t.time);return `<tr><td>${t.id}</td><td><b>${t.token}</b></td><td>${t.direction}</td><td>${t.entry}</td><td>${n}</td><td class="${r>=0?"PASS":"REJECT"}">${r==null?"—":r.toFixed(2)+"%"}</td><td>${Math.floor(ageMin(t.time))}m</td><td>${nx?nx+"m":"24h+"}</td><td><span class="pill WATCH">ACTIVE</span></td></tr>`}).join("")||'<tr><td colspan="9" class="small">No active paper tests.</td></tr>';
+ let preds=state.predictions, scored=0,hits=0;
+ $("predN").textContent=preds.length;$("longN").textContent=preds.filter(x=>x.direction==="LONG").length;$("shortN").textContent=preds.filter(x=>x.direction==="SHORT").length;$("noTradeN").textContent=preds.filter(x=>x.direction==="NO TRADE").length;
+ $("ledgerBody").innerHTML=preds.slice().reverse().map(p=>{let t=tests.find(x=>x.id===p.id),o=t&&obsAt(t,30),rr=o?pct(p.direction,p.entry,o.price):null,res="—";if(rr!=null){scored++;let hit=rr>0;if(hit)hits++;res=hit?"SUCCESS":"FAIL"}return `<tr><td>${p.id}</td><td>${new Date(p.time).toLocaleString()}</td><td>${p.token}</td><td>${p.direction}</td><td>${p.confidence}%</td><td>${p.horizon}</td><td>${p.signal}</td><td>${p.risk}</td><td>${fmt(p.liquidity)}</td><td>${rr==null?"—":rr.toFixed(2)+"%"}</td><td><span class="pill ${res==="SUCCESS"?"PASS":res==="FAIL"?"REJECT":"MISSING"}">${res}</span></td></tr>`}).join("")||'<tr><td colspan="11" class="small">No frozen predictions yet. Start a paper test from a candidate.</td></tr>';
+ $("scored30").textContent=scored;$("hit30").textContent=scored?Math.round(hits/scored*100)+"%":"—"
+}
+$("searchBtn").onclick=scan;$("refreshWatch").onclick=refreshPaperWatch;$("paperTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("calTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("testBtn").onclick=testConnections;$("close").onclick=()=>$("modal").classList.remove("on");$("gemKey").oninput=e=>gemKey=e.target.value;
+$("importBtn").onclick=()=>$("file").click();$("file").onchange=async e=>{try{let d=JSON.parse(await e.target.files[0].text());let arr=Array.isArray(d)?d:(d.paper_tests||[]);state.paperTests=arr;state.predictions=d.predictions||state.predictions;saveState();renderPaper();addAlert(`Imported ${arr.length} paper tests.`,"PASS")}catch(x){addAlert("Paper JSON import failed.","REJECT")}};
+$("exportBtn").onclick=()=>{let b=new Blob([JSON.stringify({version:"FOMO-QS-v0.2",exported_at:new Date().toISOString(),paper_tests:state.paperTests,predictions:state.predictions},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="fomo-quant-v02-full-log.json";a.click();URL.revokeObjectURL(a.href)};
+renderPaper();
+</script>
+</body></html>
