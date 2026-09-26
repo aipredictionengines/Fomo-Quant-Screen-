@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>FOMO Quant Screen v0.2</title>
+<title>FOMO Quant Screen v0.2.1</title>
 <style>
 :root{--bg:#03111b;--panel:#061b29;--panel2:#082334;--line:#0b4660;--cyan:#00d9ff;--green:#28e79b;--amber:#ffbd3e;--red:#ff5665;--txt:#eaf7ff;--muted:#86a8bb}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 45% 0,#08304a 0,#03111b 32%,#020b12 100%);color:var(--txt);font:14px Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
@@ -47,6 +47,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px 8px;border-bottom:1p
 <label>Gemini API key</label><input id="gemKey" class="input" type="password" placeholder="Session only — never saved"/>
 <label>Gemini model</label><input id="gemModel" class="input" value="gemini-3.8-flash"/>
 <div id="gemStatus" class="status">Gemini · not tested</div>
+<button id="retryGemBtn" style="margin-top:8px">RETRY GEMINI</button>
 <button id="testBtn" style="margin-top:10px">TEST CONNECTIONS</button>
 <p class="small">Gemini key is kept in memory only and is cleared on refresh. For public deployment, use a private backend proxy instead of a browser key.</p>
 <hr style="border:0;border-top:1px solid #123a4c;margin:18px 0">
@@ -95,7 +96,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px 8px;border-bottom:1p
 <div style="overflow:auto"><table><thead><tr><th>ID</th><th>Time</th><th>Token</th><th>Direction</th><th>Confidence</th><th>Horizon</th><th>Signal</th><th>Risk</th><th>Liquidity</th><th>30m</th><th>Result</th></tr></thead><tbody id="ledgerBody"><tr><td colspan="11" class="small">No frozen predictions yet. Start a paper test from a candidate.</td></tr></tbody></table></div>
 <div class="small" style="margin-top:10px">Calibration uses every completed observation, including losses and NO TRADE decisions. Raw v0.1 signal/risk scores remain unchanged until the dataset is large enough to justify recalibration.</div>
 </section>
-<div class="panel footer">FOMO Quant Screen v0.2 · Research + paper testing only · Missing data is shown as missing, never invented · External data may be delayed or incomplete.</div>
+<div class="panel footer">FOMO Quant Screen v0.2.1 · Research + paper testing only · Missing data is shown as missing, never invented · External data may be delayed or incomplete.</div>
 </main></div>
 
 <div class="modal" id="modal"><div class="panel box"><div class="sectiontitle"><b id="modalTitle">INVESTIGATION</b><button id="close" style="width:auto">CLOSE</button></div><div id="modalBody" class="analysis"></div></div></div>
@@ -150,11 +151,53 @@ function draw(a){let s=$("scatter");s.innerHTML='<line x1="50" y1="285" x2="775"
  a.forEach(p=>{let x=50+p._signal*7.1,y=285-Math.min(250,Math.log10(Math.max(p.volume?.h24||1,1))*34),good=p._risk<=35;s.innerHTML+=`<circle cx="${x}" cy="${y}" r="${good?6:4}" fill="${good?"#28e79b":"#00aee8"}" opacity=".85"><title>${p.baseToken?.symbol} signal ${p._signal} risk ${p._risk}</title></circle>`})
 }
 function addAlert(msg,sev="WATCH"){$("alerts").insertAdjacentHTML("afterbegin",`<div class="event"><span>${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span><span>${msg}</span><span class="pill ${sev}">${sev}</span></div>`)}
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function geminiRequest(prompt,maxOutputTokens=900){
+  if(!gemKey) throw new Error("NO_KEY");
+  const model=$("gemModel").value.trim();
+  const waits=[0,2000,5000,10000];
+  let lastErr=null;
+  for(let attempt=0;attempt<waits.length;attempt++){
+    if(waits[attempt]) await sleep(waits[attempt]);
+    try{
+      let r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-goog-api-key":gemKey},
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.15,maxOutputTokens}})
+      });
+      if(r.ok) return await r.json();
+      let body=""; try{body=await r.text()}catch(_){}
+      let e=new Error(`HTTP ${r.status}`); e.status=r.status; e.body=body;
+      lastErr=e;
+      if(![429,500,502,503,504].includes(r.status)) throw e;
+      $("gemStatus").innerHTML=`<span class="warn">● Gemini · TEMPORARILY UNAVAILABLE (${r.status}) · retry ${attempt+1}/${waits.length}</span>`;
+    }catch(e){
+      lastErr=e;
+      if(e.status && ![429,500,502,503,504].includes(e.status)) throw e;
+    }
+  }
+  throw lastErr||new Error("Gemini unavailable");
+}
+async function retryGemini(){
+  gemKey=$("gemKey").value.trim();
+  if(!gemKey){$("gemStatus").innerHTML='<span class="warn">● Gemini · key not entered</span>';return false}
+  $("gemStatus").innerHTML='<span class="warn">● Gemini · testing with automatic retry…</span>';
+  try{
+    let d=await geminiRequest("Reply only: FOMO_QUANT_OK",20);
+    $("gemStatus").innerHTML='<span class="ok">● Gemini · CONNECTED</span>';
+    addAlert("Gemini connection restored.","PASS"); return true
+  }catch(e){
+    let code=e.status||"network";
+    $("gemStatus").innerHTML=`<span class="warn">● Gemini · TEMPORARILY UNAVAILABLE (${code}) · RULES-ONLY MODE</span>`;
+    addAlert(`Gemini unavailable (${code}). Quant Screen continues in RULES-ONLY MODE.`,"WATCH"); return false
+  }
+}
+
 async function testConnections(){
  await scan();
  let cg=$("cgKey").value.trim(); try{let u="https://api.coingecko.com/api/v3/ping",opt={};if(cg){u="https://api.coingecko.com/api/v3/ping";opt.headers={"x-cg-demo-api-key":cg}}let r=await fetch(u,opt);if(!r.ok)throw Error("HTTP "+r.status);$("cgStatus").innerHTML='<span class="ok">● CoinGecko · CONNECTED</span>'}catch(e){$("cgStatus").innerHTML=`<span class="warn">● CoinGecko · ${e.message}</span>`}
- gemKey=$("gemKey").value.trim(); if(!gemKey){$("gemStatus").innerHTML='<span class="warn">● Gemini · key not entered</span>';return}
- try{let model=$("gemModel").value.trim();let r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":gemKey},body:JSON.stringify({contents:[{parts:[{text:"Reply only: FOMO_QUANT_OK"}]}],generationConfig:{maxOutputTokens:20}})});if(!r.ok)throw Error("HTTP "+r.status);let d=await r.json();$("gemStatus").innerHTML='<span class="ok">● Gemini · CONNECTED</span>'}catch(e){$("gemStatus").innerHTML=`<span class="bad">● Gemini · ${e.message}</span>`}
+ gemKey=$("gemKey").value.trim(); await retryGemini();
 }
 async function investigate(p){
  $("modal").classList.add("on");$("modalTitle").textContent=`INVESTIGATE · ${p.baseToken?.symbol||"TOKEN"}`;
@@ -177,8 +220,12 @@ Execution delay/slippage: INSUFFICIENT DATA`;
  $("modalBody").textContent=raw+"\n\nGemini: "+(gemKey?"analyzing…":"key not connected — rules-only view.");
  if(gemKey)try{
   let prompt=`You are the analysis layer of a PAPER-TEST-ONLY FOMO copyability research tool. Never invent missing data. Analyze the snapshot below. Return concise sections: Evidence, Token Risk, Execution Risk, Missing Data, Decision (ALLOW PAPER/WATCH/REJECT/INSUFFICIENT DATA). A good token never overrides missing trader/copyability evidence.\n\n${raw}`;
-  let model=$("gemModel").value.trim();let r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":gemKey},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.15,maxOutputTokens:900}})});let d=await r.json();let t=d.candidates?.[0]?.content?.parts?.map(x=>x.text||"").join("")||JSON.stringify(d);$("modalBody").textContent=raw+"\n\nGEMINI ANALYSIS\n"+t
- }catch(e){$("modalBody").textContent=raw+"\n\nGemini error: "+e.message}
+  let d=await geminiRequest(prompt,900);let t=d.candidates?.[0]?.content?.parts?.map(x=>x.text||"").join("")||JSON.stringify(d);
+  $("modalBody").textContent=raw+"\n\nGEMINI ANALYSIS\n"+t
+ }catch(e){
+  $("modalBody").textContent=raw+"\n\nGemini temporarily unavailable. RULES-ONLY MODE remains active.\nReason: "+(e.status?("HTTP "+e.status):e.message);
+  $("gemStatus").innerHTML=`<span class="warn">● Gemini · TEMPORARILY UNAVAILABLE (${e.status||"network"}) · RULES-ONLY MODE</span>`;
+ }
 }
 
 function chooseDirection(p){
@@ -227,9 +274,9 @@ function renderPaper(){
  $("ledgerBody").innerHTML=preds.slice().reverse().map(p=>{let t=tests.find(x=>x.id===p.id),o=t&&obsAt(t,30),rr=o?pct(p.direction,p.entry,o.price):null,res="—";if(rr!=null){scored++;let hit=rr>0;if(hit)hits++;res=hit?"SUCCESS":"FAIL"}return `<tr><td>${p.id}</td><td>${new Date(p.time).toLocaleString()}</td><td>${p.token}</td><td>${p.direction}</td><td>${p.confidence}%</td><td>${p.horizon}</td><td>${p.signal}</td><td>${p.risk}</td><td>${fmt(p.liquidity)}</td><td>${rr==null?"—":rr.toFixed(2)+"%"}</td><td><span class="pill ${res==="SUCCESS"?"PASS":res==="FAIL"?"REJECT":"MISSING"}">${res}</span></td></tr>`}).join("")||'<tr><td colspan="11" class="small">No frozen predictions yet. Start a paper test from a candidate.</td></tr>';
  $("scored30").textContent=scored;$("hit30").textContent=scored?Math.round(hits/scored*100)+"%":"—"
 }
-$("searchBtn").onclick=scan;$("refreshWatch").onclick=refreshPaperWatch;$("paperTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("calTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("testBtn").onclick=testConnections;$("close").onclick=()=>$("modal").classList.remove("on");$("gemKey").oninput=e=>gemKey=e.target.value;
+$("searchBtn").onclick=scan;$("retryGemBtn").onclick=retryGemini;$("refreshWatch").onclick=refreshPaperWatch;$("paperTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("calTab").onclick=()=>document.getElementById("calibrationLab").scrollIntoView({behavior:"smooth"});$("testBtn").onclick=testConnections;$("close").onclick=()=>$("modal").classList.remove("on");$("gemKey").oninput=e=>gemKey=e.target.value;
 $("importBtn").onclick=()=>$("file").click();$("file").onchange=async e=>{try{let d=JSON.parse(await e.target.files[0].text());let arr=Array.isArray(d)?d:(d.paper_tests||[]);state.paperTests=arr;state.predictions=d.predictions||state.predictions;saveState();renderPaper();addAlert(`Imported ${arr.length} paper tests.`,"PASS")}catch(x){addAlert("Paper JSON import failed.","REJECT")}};
-$("exportBtn").onclick=()=>{let b=new Blob([JSON.stringify({version:"FOMO-QS-v0.2",exported_at:new Date().toISOString(),paper_tests:state.paperTests,predictions:state.predictions},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="fomo-quant-v02-full-log.json";a.click();URL.revokeObjectURL(a.href)};
+$("exportBtn").onclick=()=>{let b=new Blob([JSON.stringify({version:"FOMO-QS-v0.2.1",exported_at:new Date().toISOString(),paper_tests:state.paperTests,predictions:state.predictions},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="fomo-quant-v02-full-log.json";a.click();URL.revokeObjectURL(a.href)};
 renderPaper();
 </script>
 </body></html>
