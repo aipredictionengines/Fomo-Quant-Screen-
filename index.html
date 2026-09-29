@@ -1,0 +1,1968 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PumpCall Radar v0.1 — FOMO quant screen</title>
+<meta name="description" content="PumpCall Radar: early pump detection, entry / chase limits, TP/SL, paper tracking, Early Signal Database. DEX Screener · GeckoTerminal · CoinGecko · Birdeye · FOMO.">
+<meta name="theme-color" content="#04060a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2304060a' stroke='%2343d9ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%231f5a73' stroke-width='1.5'/%3E%3Cpath d='M16 16 L28 10' stroke='%2343d9ff' stroke-width='2'/%3E%3Ccircle cx='22' cy='20' r='2.5' fill='%2335f08d'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04060a; --panel:#0c1118; --panel2:#101723; --line:#1a2432; --line2:#263447;
+  --txt:#cdd8e8; --mut:#7d8ba1; --dim:#465366;
+  --cyan:#43d9ff; --green:#35f08d; --red:#ff4a67; --amber:#ffb13d; --violet:#ae8cff; --yellow:#f2df55;
+  --mono:'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --disp:'Chakra Petch', 'IBM Plex Mono', ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:12px/1.45 var(--mono);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:radial-gradient(1400px 520px at 50% -140px,#0b1a2e 0%,rgba(4,6,10,0) 70%),var(--bg)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);z-index:50}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:1px solid var(--cyan);outline-offset:1px}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:7px 12px;background:#060a10;border-bottom:1px solid var(--line)}
+.brand{font:700 16px/1 var(--disp);letter-spacing:.06em;color:var(--cyan);text-shadow:0 0 12px rgba(67,217,255,.35);white-space:nowrap}
+.brand small{font:500 10px var(--mono);color:var(--mut);letter-spacing:0;margin-left:8px;text-shadow:none}
+.mode{font-weight:700;font-size:11px;padding:2px 8px;border:1px solid currentColor}
+.mode.live{color:var(--green)} .mode.sim{color:var(--amber)}
+.clock{color:var(--txt);font-variant-numeric:tabular-nums}
+.lights{display:flex;gap:10px;align-items:center;font-size:10px;color:var(--mut)}
+.lights span{display:inline-flex;align-items:center;gap:4px;cursor:help}
+.light{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block}
+.light.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.light.warn{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.light.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+.light.off{background:#222c3a}
+.spacer{flex:1}
+#scanInfo{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+
+/* ---------- KPI strip ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));border-bottom:1px solid var(--line);background:#070b12}
+.kpi{padding:6px 10px 7px;border-right:1px solid var(--line);min-width:0}
+.kpi b{display:block;font:600 17px/1.2 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi span{display:block;font-size:10px;color:var(--mut);white-space:nowrap}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;overflow-x:auto;background:#060a10;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.tab{appearance:none;background:none;border:0;border-right:1px solid var(--line);color:var(--mut);font:600 11px var(--mono);letter-spacing:.04em;padding:9px 14px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--txt)}
+.tab[aria-selected=true]{color:var(--cyan);background:var(--panel);box-shadow:inset 0 -2px 0 var(--cyan)}
+.tab .cnt{margin-left:6px;color:var(--amber)}
+
+main{padding:10px}
+.view{display:none} .view.on{display:block}
+
+/* ---------- layout ---------- */
+.grid-live{display:grid;grid-template-columns:320px minmax(0,1fr) 390px;gap:10px;align-items:start}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.quant{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:10px}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:1480px){.grid-live{grid-template-columns:300px minmax(0,1fr)}.snapcol{grid-column:1/-1}}
+@media (max-width:980px){.grid-live,.quant,.cols2,.cols3{grid-template-columns:1fr}}
+
+/* ---------- panels ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);min-width:0}
+.ph{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);font:600 11px/1.3 var(--disp);letter-spacing:.07em;color:var(--txt);background:linear-gradient(180deg,#0f1622,#0c1118)}
+.ph i{font-style:normal;color:var(--cyan)}
+.ph .r{margin-left:auto;font:500 10px var(--mono);letter-spacing:0;color:var(--mut)}
+.pb{padding:8px 10px}
+.pb.tight{padding:0}
+.hint{color:var(--mut);font-size:11px}
+.empty{padding:22px 12px;color:var(--mut);text-align:center}
+
+/* ---------- tables ---------- */
+.scroll{overflow:auto}
+.sig-scroll{max-height:520px}
+table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.t th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);font-weight:600;font-size:10px;text-align:right;padding:5px 7px;border-bottom:1px solid var(--line2);white-space:nowrap;user-select:none}
+.t th[data-sort]{cursor:pointer} .t th[data-sort]:hover{color:var(--txt)}
+.t th.on{color:var(--cyan)}
+.t td{padding:4px 7px;text-align:right;border-bottom:1px solid #121a26;white-space:nowrap}
+.t th.l,.t td.l{text-align:left}
+.t tbody tr{cursor:pointer}
+.t tbody tr:hover td{background:#111b29}
+.t tr.sel td{background:#0f2238}
+.t tr.sel td:first-child{box-shadow:inset 2px 0 0 var(--cyan)}
+.tok b{color:var(--txt)} .tok small{color:var(--mut);margin-left:5px}
+
+.up{color:var(--green)} .dn{color:var(--red)} .mut{color:var(--mut)} .dim{color:var(--dim)} .amb{color:var(--amber)} .cy{color:var(--cyan)} .vi{color:var(--violet)} .yl{color:var(--yellow)}
+.dec{display:inline-block;padding:0 6px;font-weight:700;font-size:10px;line-height:16px;border:1px solid currentColor;white-space:nowrap}
+.dec.ALLOW{color:var(--green)} .dec.WATCH{color:var(--cyan)} .dec.LATE{color:var(--amber)} .dec.REJECT{color:var(--red)} .dec.INV{color:var(--violet)}
+.stg{display:inline-block;font-size:10px;font-weight:600;min-width:52px;text-align:left}
+.s0{color:var(--dim)} .s1{color:var(--cyan)} .s2{color:var(--green)} .s3{color:var(--yellow)} .s4{color:var(--amber)} .s5{color:var(--red)}
+.es{font-weight:600}
+.pill{display:inline-block;min-width:28px;text-align:center;font-weight:700}
+
+/* ---------- toolbar / chips ---------- */
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}
+.chip{appearance:none;background:none;border:1px solid var(--line2);color:var(--mut);font-size:10px;font-weight:600;padding:2px 7px;cursor:pointer}
+.chip:hover{color:var(--txt)}
+.chip.on{color:var(--cyan);border-color:var(--cyan)}
+input[type=text],input[type=number],input[type=password],input[type=search],select,textarea{background:#070c14;border:1px solid var(--line2);padding:4px 6px;font-size:12px;border-radius:0}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan);outline:none}
+textarea{width:100%;resize:vertical;min-height:52px}
+.btn{appearance:none;background:#0e1826;border:1px solid var(--line2);color:var(--txt);font:600 11px var(--mono);padding:5px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn.go{border-color:#1f6b45;color:var(--green)} .btn.go:hover{border-color:var(--green)}
+.btn.vi{border-color:#4d3f7a;color:var(--violet)} .btn.vi:hover{border-color:var(--violet)}
+.btn.bad{border-color:#6b2533;color:var(--red)} .btn.bad:hover{border-color:var(--red)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.sm{padding:2px 7px;font-size:10px}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ---------- radar ---------- */
+.radar-wrap{display:flex;justify-content:center;padding:8px 0 4px}
+#radar{display:block}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;padding:0 10px 8px;font-size:10px;color:var(--mut)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+
+/* funnel & hist */
+.fun{display:grid;grid-template-columns:108px 1fr 34px;gap:4px 8px;align-items:center;font-size:11px}
+.fun .b{height:10px;background:#131d2b;position:relative}
+.fun .b i{position:absolute;inset:0 auto 0 0}
+.fun .b em{position:absolute;inset:0 auto 0 0;background:var(--green);opacity:.9}
+.hist{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:6px;position:relative}
+.hist div{flex:1;background:#1c2a3d;position:relative;min-height:1px}
+.hist div.q{background:#1f5a73} .hist div.p{background:#1f7a4d}
+.hist-ax{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-top:3px}
+
+/* heat grid */
+.heat td{padding:3px 5px;font-size:10px;text-align:center;border-bottom:1px solid #0a0f16;border-right:1px solid #0a0f16}
+.heat th{text-align:center}
+
+/* tape */
+.tape{max-height:300px;overflow:auto;font-size:11px}
+.tape div{display:grid;grid-template-columns:58px 48px 1fr;gap:6px;padding:3px 10px;border-bottom:1px dashed #131c28;cursor:pointer}
+.tape div:hover{background:#0f1826}
+.tape time{color:var(--dim)} .tape b{font-weight:600;font-size:10px}
+
+/* ---------- snapshot ---------- */
+.snap{font-size:11.5px}
+.snap h2{margin:0;font:700 20px/1.1 var(--disp);letter-spacing:.03em}
+.snap .sub{color:var(--mut);font-size:10.5px;margin-top:3px;word-break:break-all}
+.snap .big{font:600 22px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.sect{border-top:1px solid var(--line);padding:8px 10px}
+.sect h3{margin:0 0 6px;font:600 10.5px var(--disp);letter-spacing:.08em;color:var(--mut)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-variant-numeric:tabular-nums}
+.kv dt{color:var(--mut);white-space:nowrap} .kv dd{margin:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.plan{display:grid;grid-template-columns:auto 1fr auto auto;gap:2px 10px;font-variant-numeric:tabular-nums;align-items:baseline}
+.plan span:nth-child(4n+1){color:var(--mut);white-space:nowrap}
+.plan span:nth-child(4n+2){text-align:right;font-weight:600}
+.plan span:nth-child(4n+3),.plan span:nth-child(4n){text-align:right}
+.callout{margin-top:8px;padding:6px 8px;border-left:3px solid var(--amber);background:#1c140a;font-size:11px}
+.callout.bad{border-color:var(--red);background:#1c0b10}
+.callout.ok{border-color:var(--green);background:#0a1a12}
+.callout b{letter-spacing:.04em}
+.bars{display:grid;grid-template-columns:96px 1fr 30px;gap:3px 8px;align-items:center}
+.bars .b{height:7px;background:#131d2b;position:relative}
+.bars .b i{position:absolute;inset:0 auto 0 0;background:var(--cyan)}
+.bars span:nth-child(3n+1){color:var(--mut);white-space:nowrap}
+.bars span:nth-child(3n){text-align:right;font-variant-numeric:tabular-nums}
+.decision-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.decision-row .dec{font-size:12px;line-height:20px;padding:0 8px}
+.reasons{color:var(--mut);font-size:10.5px}
+.srcs{display:flex;flex-wrap:wrap;gap:4px}
+.srcs span{font-size:10px;border:1px solid var(--line2);padding:0 5px;color:var(--mut)}
+.srcs span b{color:var(--txt);font-weight:600}
+#snapChart{display:block;width:100%;height:150px}
+.lock{font-size:10px;color:var(--mut)} .lock b{color:var(--violet)}
+.tl{display:grid;grid-template-columns:auto 1fr auto;gap:1px 10px;font-variant-numeric:tabular-nums}
+.tl span:nth-child(3n+1){color:var(--mut)} .tl span:nth-child(3n+2){text-align:right} .tl span:nth-child(3n){text-align:right;color:var(--dim)}
+.edge{font-weight:700;padding:0 6px;border:1px solid currentColor}
+.edge.GOOD{color:var(--green)} .edge.FAIR{color:var(--yellow)} .edge.LOST{color:var(--red)}
+
+/* stats grid */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.stats div{background:var(--panel);padding:7px 10px}
+.stats b{display:block;font:600 16px/1.2 var(--mono);font-variant-numeric:tabular-nums}
+.stats span{font-size:10px;color:var(--mut)}
+canvas.chart{display:block;width:100%}
+
+/* research */
+.rs{border-bottom:1px solid var(--line);padding:10px}
+.rs-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rs-h h4{margin:0;font:700 14px var(--disp)}
+.rs-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:8px}
+@media (max-width:980px){.rs-body{grid-template-columns:1fr}}
+.notes{max-height:170px;overflow:auto;border:1px solid var(--line);padding:4px 8px;font-size:11px}
+.notes p{margin:0;padding:3px 0;border-bottom:1px dashed #131c28}
+.notes time{color:var(--dim);margin-right:6px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--mut)}
+
+/* errors */
+.err-row{display:grid;grid-template-columns:132px 50px 58px 118px minmax(0,1fr);gap:8px;padding:4px 10px;border-bottom:1px solid #121a26;font-size:11px}
+.err-row .d{grid-column:5;color:var(--dim);word-break:break-all;font-size:10px}
+.lv-ERROR{color:var(--red)} .lv-WARN{color:var(--amber)} .lv-INFO{color:var(--cyan)}
+@media (max-width:980px){.err-row{grid-template-columns:1fr 1fr}.err-row .d{grid-column:1/-1}}
+
+/* config */
+.cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+.cfg .pb{display:grid;grid-template-columns:1fr 170px;gap:6px 10px;align-items:center}
+.cfg .pb label{color:var(--txt);font-size:11px}
+.cfg .pb label small{display:block;color:var(--mut);font-size:10px}
+.cfg input[type=text],.cfg input[type=number],.cfg input[type=password],.cfg select{width:100%}
+.cfg .chains{display:flex;gap:8px;flex-wrap:wrap}
+
+#toast{position:fixed;right:14px;bottom:14px;z-index:60;background:#0f1a2a;border:1px solid var(--cyan);color:var(--txt);padding:8px 12px;font-size:12px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none;max-width:360px}
+#toast.on{opacity:1;transform:none}
+footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px solid var(--line);margin-top:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- ui additions ---------- */
+.prog{height:8px;background:#131d2b;position:relative;margin:6px 0 3px}
+.prog i{position:absolute;inset:0 auto 0 0;background:var(--violet);box-shadow:0 0 8px rgba(174,140,255,.5)}
+.tabnote{padding:7px 10px;color:var(--mut);font-size:11px;border-bottom:1px solid var(--line);line-height:1.5}
+.tabnote b{color:var(--txt);font-weight:600}
+.mini{font-size:10px;color:var(--mut)}
+.chg{display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums;margin-top:5px;font-size:11px}
+.chg i{font-style:normal;color:var(--mut);margin-right:3px}
+.snap-head{padding:8px 10px}
+.snap-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.links{display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;margin-top:6px}
+.ul{margin:0;padding-left:16px;color:var(--mut);font-size:11px}
+.ul li{margin:1px 0} .ul li b{color:var(--txt);font-weight:600}
+.pvw{color:var(--amber);font-size:10px;font-weight:700;border:1px dashed var(--amber);padding:0 5px}
+.t td.w{white-space:normal;min-width:160px;text-align:left}
+.panel + .panel{margin-top:10px}
+.gap{height:10px}
+.rs-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;font-variant-numeric:tabular-nums}
+.rs-meta i{font-style:normal;color:var(--mut);margin-right:4px}
+.kbd{border:1px solid var(--line2);padding:0 4px;font-size:10px;color:var(--mut)}
+
+.snap .kv dd{white-space:normal;overflow:visible;word-break:break-word}
+.err-row details summary{cursor:pointer;color:var(--mut)}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">PUMPCALL RADAR<small>v0.1 · FOMO stack · quant screen</small></div>
+  <span id="modeBadge" class="mode"></span>
+  <span class="clock" id="clock">--:--:--</span>
+  <div class="lights" id="lights"></div>
+  <div class="spacer"></div>
+  <span id="scanInfo"></span>
+  <button class="btn" data-act="scan" title="Пусни цикъл сега">SCAN NOW</button>
+  <button class="btn" data-act="pause" id="pauseBtn">PAUSE</button>
+</header>
+<section class="kpis" id="kpis" aria-label="Ключови показатели"></section>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+
+<main>
+  <!-- LIVE SIGNALS -->
+  <section class="view on" id="v-live" role="tabpanel">
+    <div class="grid-live">
+      <div class="col">
+        <div class="panel">
+          <div class="ph"><i>◆</i> RADAR SCOPE <span class="r" id="radarInfo"></span></div>
+          <div class="radar-wrap"><canvas id="radar" width="300" height="300" aria-label="Радар: ринговете са етапи на pump-а, цветът е решението"></canvas></div>
+          <div class="legend">
+            <span><i style="background:#35f08d"></i>ALLOW PAPER</span>
+            <span><i style="background:#43d9ff"></i>WATCH</span>
+            <span><i style="background:#ffb13d"></i>TOO LATE</span>
+            <span><i style="background:#ff4a67"></i>REJECT</span>
+            <span><i style="background:none;border:1px solid #ae8cff"></i>INVESTIGATE</span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><i>◆</i> STAGE FUNNEL <span class="r">зелено = ALLOW PAPER</span></div>
+          <div class="pb"><div class="fun" id="funnel"></div></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><i>◆</i> EVENT TAPE <span class="r" id="tapeInfo"></span></div>
+          <div class="tape" id="tape"></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="panel">
+          <div class="ph"><i>◆</i> LIVE SIGNALS <span class="r" id="sigInfo"></span></div>
+          <div class="toolbar">
+            <input type="search" id="q" placeholder="търси символ / адрес" aria-label="Търсене" style="width:170px">
+            <span id="decChips"></span>
+          </div>
+          <div class="scroll sig-scroll"><table class="t" id="sig"></table></div>
+        </div>
+        <div class="quant">
+          <div class="panel">
+            <div class="ph"><i>◆</i> LIQUIDITY × Δ1H <span class="r">размер = обем 1h</span></div>
+            <div class="pb"><canvas class="chart" id="scatter" height="230"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><i>◆</i> RADAR SCORE DISTRIBUTION <span class="r" id="histInfo"></span></div>
+            <div class="pb"><div class="hist" id="hist"></div><div class="hist-ax"><span>0</span><span>50</span><span>100</span></div>
+              <div class="hint" style="margin-top:6px">Синьо ≥ QUALIFY · зелено ≥ PAPER праг</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><i>◆</i> HEAT GRID · TOP 20 BY RADAR <span class="r">зелено = силно / червено = слабо или рисково</span></div>
+          <div class="scroll"><table class="t heat" id="heat"></table></div>
+        </div>
+      </div>
+
+      <div class="col snapcol">
+        <div class="panel">
+          <div class="ph"><i>◆</i> PUMPCALL SNAPSHOT <span class="r" id="snapInfo"></span></div>
+          <div id="snap" class="snap"><div class="empty">Избери токен от таблицата или радара.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-limits" role="tabpanel"><div class="panel"><div class="ph"><i>◆</i> ENTRY LIMITS <span class="r">активни планове · заключени при квалификация</span></div><div class="scroll" id="limits"></div></div></section>
+  <section class="view" id="v-tpsl" role="tabpanel"><div id="tpsl"></div></section>
+  <section class="view" id="v-missed" role="tabpanel"><div id="missed"></div></section>
+  <section class="view" id="v-results" role="tabpanel"><div id="results"></div></section>
+  <section class="view" id="v-esdb" role="tabpanel"><div id="esdb"></div></section>
+  <section class="view" id="v-research" role="tabpanel">
+    <div class="panel">
+      <div class="ph"><i>◆</i> RESEARCH & TRACKING <span class="r">проучвания, бележки, проследяване на монети</span></div>
+      <div class="toolbar">
+        <select id="rsChain" aria-label="Chain"><option>solana</option><option>base</option><option>bsc</option><option>ethereum</option></select>
+        <input type="text" id="rsAddr" placeholder="contract / mint адрес" style="width:320px" aria-label="Адрес">
+        <button class="btn go" data-act="rs-add">ADD & TRACK</button>
+        <span class="spacer"></span>
+        <button class="btn" data-act="rs-export">EXPORT RESEARCH JSON</button>
+      </div>
+      <div id="research"></div>
+    </div>
+  </section>
+  <section class="view" id="v-errors" role="tabpanel"><div id="errorsTop"></div>
+    <div class="cols2" style="margin-top:10px">
+      <div class="panel"><div class="ph"><i>◆</i> SOFTWARE ERROR LOG <span class="r" id="errInfo"></span></div>
+        <div class="toolbar" id="errFilters"></div><div id="errList" class="scroll" style="max-height:620px"></div></div>
+      <div class="panel"><div class="ph"><i>◆</i> BUG REPORT</div>
+        <div class="pb" style="display:grid;gap:8px">
+          <label class="f">Модул<select id="bugModule"><option>LIVE SIGNALS</option><option>SCORING / ENGINE</option><option>ENTRY / TP / SL</option><option>PAPER ENGINE</option><option>EARLY SIGNAL DB</option><option>RESEARCH</option><option>API: DEXSCREENER</option><option>API: GECKOTERMINAL / COINGECKO</option><option>API: BIRDEYE</option><option>API: FOMO</option><option>UI</option></select></label>
+          <label class="f">Тежест<select id="bugLevel"><option value="ERROR">ERROR — грешен резултат / счупено</option><option value="WARN">WARN — съмнително поведение</option><option value="INFO">INFO — идея / наблюдение</option></select></label>
+          <label class="f">Какво се случи<input type="text" id="bugTitle" placeholder="напр. TP1 не се отчете, въпреки че цената мина нивото"></label>
+          <label class="f">Стъпки / контекст<textarea id="bugSteps" rows="4" placeholder="токен, време, какво очакваше"></textarea></label>
+          <div class="row"><label class="hint"><input type="checkbox" id="bugSnap" checked> приложи snapshot на избрания токен</label><span class="spacer"></span><button class="btn go" data-act="bug-save">LOG BUG</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="view" id="v-config" role="tabpanel"><div id="config"></div></section>
+</main>
+<footer>PumpCall Radar е инструмент за проучване и paper тестове — не изпълнява реални сделки и не е финансов съвет. Данни: DEX Screener, GeckoTerminal/CoinGecko, Birdeye, FOMO API (по избор). Всичко се пази локално в този браузър. © 2026 Dragostin · Source-Available Noncommercial License 1.0 — комерсиална употреба само с разрешение.</footer>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   PUMPCALL RADAR v0.1 — core
+   ===================================================================== */
+const VERSION = '0.1.0';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const num = (v, d = 0) => { const n = typeof v === 'string' ? parseFloat(v) : v; return Number.isFinite(n) ? n : d; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+const sig = x => 50 + 50 * Math.tanh(x);
+function fnv1a(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); }
+const hashAngle = s => parseInt(fnv1a(s).slice(0, 6), 16) / 0xffffff * Math.PI * 2;
+const SUBS = '₀₁₂₃₄₅₆₇₈₉';
+const F = {
+  usd(v) { if (v == null || !isFinite(v)) return '—'; const a = Math.abs(v), s = v < 0 ? '-' : ''; if (a >= 1e9) return s + '$' + (a / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return s + '$' + (a / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return s + '$' + (a / 1e3).toFixed(1) + 'K'; return s + '$' + a.toFixed(a < 10 ? 2 : 0); },
+  px(v) { if (v == null || !isFinite(v) || v <= 0) return '—'; if (v >= 1000) return '$' + v.toFixed(0); if (v >= 1) return '$' + v.toFixed(3); if (v >= 0.001) return '$' + v.toFixed(5); const m = v.toFixed(20).match(/^0\.(0+)(\d{4})/); if (!m) return '$' + v.toExponential(3); return '$0.0' + String(m[1].length).split('').map(d => SUBS[d]).join('') + m[2]; },
+  pct(v, d = 1) { if (v == null || !isFinite(v)) return '—'; return (v > 0 ? '+' : '') + v.toFixed(d) + '%'; },
+  x(v, d = 2) { return v == null || !isFinite(v) ? '—' : v.toFixed(d) + 'x'; },
+  n(v, d = 0) { return v == null || !isFinite(v) ? '—' : v.toFixed(d); },
+  r(v) { return v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + 'R'; },
+  time(ts) { if (!ts) return '—'; return new Date(ts).toTimeString().slice(0, 8); },
+  dt(ts) { if (!ts) return '—'; const d = new Date(ts); return String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + d.toTimeString().slice(0, 8); },
+  dur(ms) { if (ms == null || !isFinite(ms)) return '—'; const neg = ms < 0; ms = Math.abs(ms); const s = Math.round(ms / 1000); let o; if (s < 60) o = s + 's'; else if (s < 3600) o = Math.floor(s / 60) + 'm ' + String(s % 60).padStart(2, '0') + 's'; else if (s < 86400) o = Math.floor(s / 3600) + 'h ' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + 'm'; else o = Math.floor(s / 86400) + 'd ' + Math.floor(s % 86400 / 3600) + 'h'; return (neg ? '-' : '') + o; },
+  age(min) { if (min == null || !isFinite(min)) return '—'; if (min < 60) return Math.round(min) + 'm'; if (min < 2880) return (min / 60).toFixed(1) + 'h'; return Math.round(min / 1440) + 'd'; },
+  short(a) { return a ? a.slice(0, 4) + '…' + a.slice(-4) : '—'; }
+};
+const cls = v => v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
+const STAGES = ['DISCOVERED', 'EARLY ACTIVITY', 'DEVELOPING', 'BREAKOUT', 'EXTENDED', 'EXHAUSTED'];
+const STAGE_SHORT = ['DISC', 'EARLY', 'DEVELOP', 'BREAKOUT', 'EXTENDED', 'EXHAUST'];
+const decClass = d => d === 'ALLOW PAPER' ? 'ALLOW' : d === 'TOO LATE' ? 'LATE' : d === 'REJECT' ? 'REJECT' : 'WATCH';
+const SRC_LABEL = { dex_profile: 'DEX profile', dex_boost: 'DEX boost', dex_top: 'DEX top boosts', dex_cto: 'DEX CTO', gt_new: 'GT new pool', gt_trend: 'GT trending', cg_trend: 'CG trending*', be_new: 'Birdeye new', be_trend: 'Birdeye trending', fomo: 'FOMO trader', manual: 'manual' };
+
+function normChain(c) {
+  c = String(c || '').toLowerCase();
+  if (c === 'sol' || c.startsWith('solana')) return 'solana';
+  if (c === 'eth' || c === 'ethereum' || c === '1') return 'ethereum';
+  if (c === 'bnb' || c === 'bsc' || c === '56' || c.startsWith('binance')) return 'bsc';
+  if (c === 'base' || c === '8453') return 'base';
+  return c;
+}
+const keyOf = (chain, addr) => chain + ':' + (chain === 'solana' ? addr : String(addr).toLowerCase());
+function parseTs(v) { if (v == null) return null; if (typeof v === 'number') return v < 1e12 ? v * 1000 : v; const n = Number(v); if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n; const d = Date.parse(v); return Number.isFinite(d) ? d : null; }
+function slip(size, liq) { if (!(liq > 0)) return 99; const q = liq / 2; return size / (q + size) * 100 + CFG.paper.feePct; }
+function download(name, text, type = 'application/json') {
+  const b = new Blob([text], { type }); const a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+function toCSV(rows, cols) {
+  const q = v => { if (v == null) return ''; const s = typeof v === 'number' ? (Number.isFinite(v) ? String(+v.toPrecision(10)) : '') : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  return [cols.map(c => c[0]).join(','), ...rows.map(r => cols.map(c => q(c[1](r))).join(','))].join('\n');
+}
+const getPath = (o, p) => p.split('.').reduce((a, k) => a == null ? a : a[k], o);
+const setPath = (o, p, v) => { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; };
+
+/* =====================================================================
+   CONFIG — всичко се настройва от таба CONFIG и се пази в localStorage
+   ===================================================================== */
+const DEFAULT_CFG = {
+  mode: 'live', chains: ['solana'], refreshSec: 20,
+  src: { dexProfiles: true, dexBoosts: true, dexTop: true, dexCto: true, gtNew: true, gtTrending: true, gtEnrich: true, cgTrending: true, birdeye: false, fomo: false },
+  fomo: { base: 'https://getfomoapi.fun', window: '24h', topTraders: 10, perCycle: 2, handles: '' },
+  be: { base: 'https://public-api.birdeye.so' },
+  filters: { minLiqDiscovery: 10000, maxAgeH: 72, universeCap: 180 },
+  gates: { minLiq: 40000, minAgeMin: 3, maxTokenRisk: 70, maxSlipRisk: 70, qualify: 60, paper: 70, investigate: 80, minCopy: 50, allowStage3: false },
+  plan: { zoneTop: 0.3, zoneBottom: 1.0, chase: 0.4, slMult: 2.0, slMin: 6, slMax: 25, tpR: [1.5, 3, 5], ttlMin: 45, volMin: 2, volMax: 15, cooldownMin: 5 },
+  paper: { size: 5, refSize: 1000, feePct: 0.3, auto: true, maxOpen: 5, tpFrac: [0.4, 0.3, 0.3], timeStopMin: 20, timeStopR: 0.3, liqStopPct: 15, maxHoldMin: 240, target: 50 },
+  edge: { goodRunup: 25, lostRunup: 60, goodMove: 8, lostMove: 25 },
+  esdb: { hitPct: 30, sustainPct: 20, cap: 3000 },
+  sim: { tickMs: 1500 }
+};
+function deepMerge(base, over) {
+  const o = Array.isArray(base) ? [...base] : { ...base };
+  if (!over || typeof over !== 'object') return o;
+  for (const k of Object.keys(over)) {
+    if (base && base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) o[k] = deepMerge(base[k], over[k]);
+    else if (base && k in base) o[k] = over[k];
+  }
+  return o;
+}
+let CFG = (() => { try { return deepMerge(DEFAULT_CFG, JSON.parse(localStorage.getItem('pcr:v1:cfg') || '{}')); } catch (e) { return deepMerge(DEFAULT_CFG, {}); } })();
+const QP = new URLSearchParams(location.search);
+const STORED_MODE = CFG.mode;
+if (QP.get('mode') === 'sim' || QP.get('mode') === 'live') CFG.mode = QP.get('mode');
+// URL ?mode= е временен: не го записваме като постоянен режим, освен ако не е сменен от CONFIG
+function saveCfg() { try { localStorage.setItem('pcr:v1:cfg', JSON.stringify({ ...CFG, mode: QP.get('mode') === CFG.mode ? STORED_MODE : CFG.mode })); } catch (e) { } }
+let SECRETS = (() => { try { return JSON.parse(localStorage.getItem('pcr:v1:secrets') || '{}'); } catch (e) { return {}; } })();
+function saveSecrets() { try { localStorage.setItem('pcr:v1:secrets', JSON.stringify(SECRETS)); } catch (e) { } }
+
+/* =====================================================================
+   STATE + STORAGE
+   ===================================================================== */
+const S = {
+  tokens: new Map(), sel: null, paper: { open: [], closed: [] }, missed: [], esdb: [], research: [], events: [], errors: [],
+  api: {}, cgSyms: new Set(), fomo: { traders: [], cursor: 0, resolved: {} },
+  sort: { col: 'radar', dir: -1 }, filter: { q: '', dec: 'ALL' }, errFilter: { level: 'ALL', source: 'ALL' }, resFilter: 'auto',
+  tab: 'live', paused: false, scanning: false, lastScan: 0, lastScanMs: 0, nextAt: 0, cycles: 0, lastPersist: 0
+};
+const Store = {
+  k(n) { return `pcr:v1:${CFG.mode}:${n}`; },
+  get(n, d) { try { const s = localStorage.getItem(this.k(n)); return s ? JSON.parse(s) : d; } catch (e) { return d; } },
+  set(n, v) { try { localStorage.setItem(this.k(n), JSON.stringify(v)); return true; } catch (e) { Log.add('ERROR', 'APP', 'STORAGE', `Записът "${n}" не мина (${e.name}). Експортирай архив и изчисти стари данни.`); return false; } }
+};
+let onLogHook = null;
+const Log = {
+  add(level, source, code, msg, detail) {
+    const now = Date.now(); const e0 = S.errors[0];
+    if (e0 && e0.source === source && e0.code === code && e0.msg === msg && now - e0.ts < 300000) { e0.count = (e0.count || 1) + 1; e0.ts = now; }
+    else { S.errors.unshift({ id: uid(), ts: now, level, source, code, msg, detail: detail ? String(detail).slice(0, 700) : '', count: 1 }); if (S.errors.length > 1500) S.errors.length = 1500; }
+    if (onLogHook) try { onLogHook(); } catch (e) { }
+  }
+};
+window.addEventListener('error', e => Log.add('ERROR', 'APP', 'JS', e.message || 'Script error', (e.filename || '').split('/').pop() + ':' + (e.lineno || '')));
+window.addEventListener('unhandledrejection', e => Log.add('ERROR', 'APP', 'PROMISE', String((e.reason && e.reason.message) || e.reason)));
+const Tape = { add(kind, text, key, c) { S.events.unshift({ ts: Clock.now(), kind, text, key, c: c || '' }); if (S.events.length > 400) S.events.length = 400; } };
+const Clock = { now() { return CFG.mode === 'sim' ? Sim.now : Date.now(); } };
+
+/* =====================================================================
+   API CLIENT — timeouts, 429 backoff, latency, error logging
+   ===================================================================== */
+const cleanUrl = u => String(u).replace(/((?:api[_-]?)?key|token)=[^&]+/gi, '$1=***');
+const API = {
+  st(src) { return S.api[src] || (S.api[src] = { calls: 0, ok: 0, err: 0, lat: [], lastOk: 0, lastErr: null, lastErrTs: 0, backoff: 0, backoffUntil: 0 }); },
+  async get(src, url, opts = {}) {
+    const st = this.st(src);
+    if (Date.now() < st.backoffUntil) return null;
+    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), opts.timeout || 12000);
+    const t0 = performance.now(); st.calls++;
+    try {
+      const r = await fetch(url, { headers: opts.headers || {}, signal: ctrl.signal, cache: 'no-store' });
+      const ms = performance.now() - t0; st.lat.push(ms); if (st.lat.length > 40) st.lat.shift();
+      if (r.status === 429) {
+        const ra = num(r.headers.get('Retry-After'), 0) * 1000;
+        st.backoff = Math.min(300000, Math.max(ra, st.backoff ? st.backoff * 2 : 15000)); st.backoffUntil = Date.now() + st.backoff;
+        st.err++; st.lastErr = '429'; st.lastErrTs = Date.now();
+        Log.add('WARN', src, 'RATE_LIMIT', `429 Too Many Requests — пауза ${Math.round(st.backoff / 1000)}s`, cleanUrl(url)); return null;
+      }
+      if (!r.ok) {
+        st.err++; st.lastErr = 'HTTP ' + r.status; st.lastErrTs = Date.now();
+        if (r.status === 401 || r.status === 403) { st.backoff = 600000; st.backoffUntil = Date.now() + st.backoff; }
+        else if (r.status >= 500) { st.backoff = Math.min(120000, (st.backoff || 10000) * 2); st.backoffUntil = Date.now() + st.backoff; }
+        const hint = (r.status === 401 || r.status === 403) ? ' — провери API ключа в CONFIG' : '';
+        Log.add('ERROR', src, 'HTTP_' + r.status, `HTTP ${r.status}${hint}`, cleanUrl(url)); return null;
+      }
+      const txt = await r.text(); let j;
+      try { j = JSON.parse(txt); } catch (e) { st.err++; st.lastErr = 'PARSE'; st.lastErrTs = Date.now(); Log.add('ERROR', src, 'PARSE', 'Отговорът не е валиден JSON', cleanUrl(url) + ' :: ' + txt.slice(0, 160)); return null; }
+      st.ok++; st.lastOk = Date.now(); st.backoff = 0; st.lastErr = null; return j;
+    } catch (e) {
+      st.err++; const ab = e.name === 'AbortError'; st.lastErr = ab ? 'TIMEOUT' : 'NETWORK'; st.lastErrTs = Date.now();
+      st.backoff = Math.min(120000, (st.backoff || 5000) * 2); st.backoffUntil = Date.now() + st.backoff;
+      Log.add('ERROR', src, ab ? 'TIMEOUT' : 'NETWORK', ab ? 'Timeout (12s)' : `Мрежова грешка или CORS блокиране (${e.message})`, cleanUrl(url)); return null;
+    } finally { clearTimeout(to); }
+  },
+  due(tag, every) { const n = Date.now(), k = '_d_' + tag; if (!this[k] || n - this[k] >= every) { this[k] = n; return true; } return false; },
+  health(src) { const st = S.api[src]; if (!st || !st.calls) return 'off'; if (Date.now() < st.backoffUntil) return st.ok ? 'warn' : 'err'; if (st.lastErr) return st.ok ? 'warn' : 'err'; return 'ok'; },
+  avgLat(src) { const l = S.api[src]?.lat || []; return l.length ? l.reduce((a, b) => a + b, 0) / l.length : null; }
+};
+function schemaWarn(src, name, j) { Log.add('WARN', src, 'SCHEMA', `${name}: неочакван формат на отговора`, 'keys: ' + Object.keys(j || {}).slice(0, 14).join(',')); }
+
+/* =====================================================================
+   DISCOVERY + NORMALIZER
+   ===================================================================== */
+function newToken(k, chain, addr) {
+  return { key: k, chain, address: addr, symbol: '', name: '', sources: {}, srcLast: {}, t: { firstDetected: null, radarQualified: null, entryAvailable: null, userObserved: null, paperFill: null }, hist: [], miss: 0, plan: null, planHist: [], fomo: { ev: [] }, stageMax: 0 };
+}
+const Disc = {
+  see(chain, addr, tag, extra) {
+    chain = normChain(chain); if (!addr || !chain) return null;
+    if (!CFG.chains.includes(chain) && tag !== 'manual') return null;
+    const k = keyOf(chain, addr); let t = S.tokens.get(k); const now = Clock.now();
+    if (!t) { t = newToken(k, chain, addr); t.t.firstDetected = now; S.tokens.set(k, t); }
+    if (!t.sources[tag]) t.sources[tag] = now;
+    t.srcLast[tag] = now;
+    if (extra && extra.boost) t.boostAmt = Math.max(t.boostAmt || 0, num(extra.boost));
+    return t;
+  }
+};
+function applyPair(t, p) {
+  const price = num(p.priceUsd, NaN);
+  if (!(price > 0)) { t.miss++; if (!t._pxWarn) { t._pxWarn = 1; Log.add('WARN', CFG.mode === 'sim' ? 'SIM' : 'DEX', 'SCHEMA', `${p?.baseToken?.symbol || t.key}: няма priceUsd`, t.address); } return; }
+  const now = Clock.now();
+  t.symbol = p.baseToken?.symbol || t.symbol; t.name = p.baseToken?.name || t.name;
+  t.pairAddress = p.pairAddress; t.dexId = p.dexId; t.url = p.url; t.icon = p.info?.imageUrl || t.icon;
+  const m = t.m || (t.m = {});
+  const tx = w => ({ b: num(p.txns?.[w]?.buys), s: num(p.txns?.[w]?.sells) });
+  Object.assign(m, {
+    price, liq: num(p.liquidity?.usd), mc: num(p.marketCap, num(p.fdv)), fdv: num(p.fdv),
+    vol: { m5: num(p.volume?.m5), h1: num(p.volume?.h1), h6: num(p.volume?.h6), h24: num(p.volume?.h24) },
+    chg: { m5: num(p.priceChange?.m5), m15: null, h1: num(p.priceChange?.h1), h6: num(p.priceChange?.h6), h24: num(p.priceChange?.h24) },
+    tx: { m5: tx('m5'), h1: tx('h1'), h6: tx('h6'), h24: tx('h24') },
+    created: num(p.pairCreatedAt, 0) || null, boosts: num(p.boosts?.active),
+    socials: (p.info?.socials || []).length, websites: (p.info?.websites || []).length, updated: now
+  });
+  t.miss = 0; t.liqPeak = Math.max(t.liqPeak || 0, m.liq);
+  const h = t.hist; if (!h.length || h[h.length - 1][0] !== now) { h.push([now, price, m.liq, m.vol.m5, m.tx.m5.b + m.tx.m5.s]); if (h.length > 600) h.shift(); }
+  for (let i = h.length - 1; i >= 0; i--) { if (now - h[i][0] >= 15 * 60000) { if (now - h[i][0] < 21 * 60000) m.chg.m15 = (price / h[i][1] - 1) * 100; break; } }
+  if (!t.firstSnap) {
+    t.firstSnap = { ts: now, price, liq: m.liq, mc: m.mc, chgH1: m.chg.h1, chgM5: m.chg.m5 };
+    if (m.liq >= CFG.filters.minLiqDiscovery) {
+      const via = Object.keys(t.sources).map(s => SRC_LABEL[s] || s).join(', ');
+      Tape.add('DETECT', `${t.symbol} · liq ${F.usd(m.liq)} · via ${via}`, t.key, 'cy');
+    }
+  }
+  if (S.cgSyms.has(String(t.symbol).toUpperCase()) && !t.sources.cg_trend) { t.sources.cg_trend = now; t.srcLast.cg_trend = now; }
+}
+
+/* =====================================================================
+   LIVE SOURCES
+   ===================================================================== */
+const DEX = 'https://api.dexscreener.com';
+const GT = 'https://api.geckoterminal.com/api/v2';
+const GT_NET = { solana: 'solana', base: 'base', bsc: 'bsc', ethereum: 'eth' };
+const beBase = () => String(CFG.be.base || 'https://public-api.birdeye.so').replace(/\/$/, '');
+
+async function srcDex() {
+  const lists = [];
+  if (CFG.src.dexProfiles && API.due('dexProf', 60000)) lists.push(['dex_profile', DEX + '/token-profiles/latest/v1']);
+  if (CFG.src.dexBoosts && API.due('dexBoost', 60000)) lists.push(['dex_boost', DEX + '/token-boosts/latest/v1']);
+  if (CFG.src.dexTop && API.due('dexTop', 120000)) lists.push(['dex_top', DEX + '/token-boosts/top/v1']);
+  if (CFG.src.dexCto && API.due('dexCto', 120000)) lists.push(['dex_cto', DEX + '/community-takeovers/latest/v1']);
+  const res = await Promise.all(lists.map(([tag, u]) => API.get('DEX', u).then(j => [tag, j])));
+  for (const [tag, j] of res) {
+    if (!j) continue;
+    const arr = Array.isArray(j) ? j : (j.data || j.tokens);
+    if (!Array.isArray(arr)) { schemaWarn('DEX', tag, j); continue; }
+    for (const it of arr) if (it && it.chainId && it.tokenAddress) Disc.see(it.chainId, it.tokenAddress, tag, { boost: it.totalAmount || it.amount });
+  }
+}
+function gtBase(d, net) { const id = d?.relationships?.base_token?.data?.id || ''; return id.startsWith(net + '_') ? id.slice(net.length + 1) : null; }
+function gtStats(a) { const tx = a?.transactions || {}; return { b5: tx.m5 ? num(tx.m5.buyers, null) : null, s5: tx.m5 ? num(tx.m5.sellers, null) : null, tx15: tx.m15 ? num(tx.m15.buys) + num(tx.m15.sells) : null, ts: Clock.now() }; }
+async function srcGT() {
+  for (const ch of CFG.chains) {
+    const net = GT_NET[ch]; if (!net) continue;
+    const jobs = [];
+    if (CFG.src.gtNew && API.due('gtNew_' + ch, 90000)) jobs.push(['gt_new', `${GT}/networks/${net}/new_pools?page=1`]);
+    if (CFG.src.gtTrending && API.due('gtTr_' + ch, 180000)) jobs.push(['gt_trend', `${GT}/networks/${net}/trending_pools?page=1`]);
+    for (const [tag, u] of jobs) {
+      const j = await API.get('GT', u, { headers: { accept: 'application/json' } }); if (!j) continue;
+      if (!Array.isArray(j.data)) { schemaWarn('GT', tag, j); continue; }
+      for (const d of j.data) { const a = gtBase(d, net); if (!a) continue; const t = Disc.see(ch, a, tag); if (t) t.gt = gtStats(d.attributes); }
+    }
+  }
+}
+async function enrichGT() {
+  if (!CFG.src.gtEnrich || !API.due('gtEnr', 60000)) return;
+  for (const ch of CFG.chains) {
+    const net = GT_NET[ch]; if (!net) continue;
+    const top = [...S.tokens.values()].filter(t => t.chain === ch && t.pairAddress && t.s).sort((a, b) => b.s.ess - a.s.ess).slice(0, 30);
+    if (!top.length) continue;
+    const j = await API.get('GT', `${GT}/networks/${net}/pools/multi/${top.map(t => t.pairAddress).join(',')}`, { headers: { accept: 'application/json' } });
+    if (!j) continue; if (!Array.isArray(j.data)) { schemaWarn('GT', 'pools/multi', j); continue; }
+    const byPair = new Map(top.map(t => [String(t.pairAddress).toLowerCase(), t]));
+    for (const d of j.data) { const t = byPair.get(String(d?.attributes?.address || '').toLowerCase()); if (t) t.gt = gtStats(d.attributes); }
+  }
+}
+async function srcCG() {
+  if (!CFG.src.cgTrending || !API.due('cg', 300000)) return;
+  const j = await API.get('CG', 'https://api.coingecko.com/api/v3/search/trending');
+  if (!j) return; if (!Array.isArray(j.coins)) { schemaWarn('CG', 'search/trending', j); return; }
+  S.cgSyms = new Set(j.coins.map(c => String(c.item?.symbol || '').toUpperCase()).filter(Boolean));
+}
+async function srcBE() {
+  const key = SECRETS.birdeye; if (!CFG.src.birdeye || !key) return;
+  const H = ch => ({ 'X-API-KEY': key, 'x-chain': ch, accept: 'application/json' });
+  if (CFG.chains.includes('solana') && API.due('beNew', 180000)) {
+    const j = await API.get('BE', `${beBase()}/defi/v2/tokens/new_listing?time_to=${Math.floor(Date.now() / 1000)}&limit=10&meme_platform_enabled=true`, { headers: H('solana') });
+    const items = j?.data?.items; if (Array.isArray(items)) items.forEach(x => x?.address && Disc.see('solana', x.address, 'be_new')); else if (j) schemaWarn('BE', 'new_listing', j);
+  }
+  for (const ch of CFG.chains) {
+    if (!API.due('beTr_' + ch, 300000)) continue;
+    const j = await API.get('BE', `${beBase()}/defi/token_trending?sort_by=rank&sort_type=asc&offset=0&limit=20`, { headers: H(ch) });
+    const arr = j?.data?.tokens; if (Array.isArray(arr)) arr.forEach(x => x?.address && Disc.see(ch, x.address, 'be_trend')); else if (j) schemaWarn('BE', 'token_trending', j);
+  }
+  if (API.due('beSec', 60000)) {
+    const now = Clock.now();
+    const c = [...S.tokens.values()].filter(t => t.s && t.s.radar >= CFG.gates.qualify && (!t.sec || now - t.sec.ts > 1800000)).sort((a, b) => b.s.radar - a.s.radar).slice(0, 2);
+    for (const t of c) {
+      const j = await API.get('BE', `${beBase()}/defi/token_security?address=${t.address}`, { headers: H(t.chain) });
+      const d = j?.data; if (!d) { if (j) schemaWarn('BE', 'token_security', j); continue; }
+      let top = num(d.top10HolderPercent, null); if (top != null && top <= 1.5) top *= 100;
+      t.sec = { top10: top, freeze: !!(d.freezeable || d.freezeAuthority), mutable: !!d.mutableMetadata, ts: now };
+    }
+  }
+}
+function addFomoEv(t, e) {
+  const id = `${e.trader}|${e.ts}|${e.side}`; if (t.fomo.ev.some(x => x.id === id)) return;
+  t.fomo.ev.push({ id, ts: e.ts, trader: e.trader, usd: e.usd, side: e.side }); if (t.fomo.ev.length > 80) t.fomo.ev.shift();
+}
+function fomoStats(t, now) {
+  now = now || Clock.now(); const ev = t.fomo?.ev || []; let b5 = 0, b15 = 0, net = 0; const tr = new Set(); let last = null;
+  for (const e of ev) { const age = now - e.ts; if (age > 15 * 60000 || age < -60000) continue; if (e.side === 'buy') { b15++; if (age <= 5 * 60000) b5++; tr.add(e.trader); net += e.usd || 0; } else if (e.side === 'sell') net -= e.usd || 0; if (!last || e.ts > last.ts) last = e; }
+  return { b5, b15, tr15: tr.size, net15: net, last };
+}
+async function srcFOMO() {
+  const key = SECRETS.fomo; if (!CFG.src.fomo || !key) return;
+  const base = String(CFG.fomo.base || '').replace(/\/$/, ''); const H = { 'X-API-Key': key, accept: 'application/json' };
+  const unwrap = j => j?.responseObject ?? j?.data ?? j?.result ?? j;
+  const handles = String(CFG.fomo.handles || '').split(/[\s,]+/).map(s => s.replace(/^@/, '')).filter(Boolean);
+  for (const h of handles) {
+    if (S.fomo.resolved[h] || !API.due('fomoU_' + h, 600000)) continue;
+    const u = unwrap(await API.get('FOMO', `${base}/api/users/${encodeURIComponent(h)}`, { headers: H }));
+    const id = u?.id || u?.userId; if (id) S.fomo.resolved[h] = id;
+  }
+  if (API.due('fomoLb', 600000)) {
+    const j = await API.get('FOMO', `${base}/api/leaderboard/${encodeURIComponent(CFG.fomo.window)}?limit=${CFG.fomo.topTraders}`, { headers: H });
+    let arr = unwrap(j); if (arr && !Array.isArray(arr)) arr = arr.items || arr.leaderboard || arr.users || arr.traders;
+    if (Array.isArray(arr)) S.fomo.traders = arr.map(x => ({ id: x.id || x.userId || x.user?.id, handle: x.handle || x.username || x.user?.handle || '' })).filter(x => x.id);
+    else if (j) schemaWarn('FOMO', 'leaderboard', j);
+  }
+  const seen = new Set(); const all = [...Object.entries(S.fomo.resolved).map(([h, id]) => ({ id, handle: h })), ...S.fomo.traders].filter(x => !seen.has(x.id) && seen.add(x.id));
+  if (!all.length) return;
+  for (let i = 0; i < Math.min(CFG.fomo.perCycle, all.length); i++) {
+    const tr = all[S.fomo.cursor++ % all.length];
+    const j = await API.get('FOMO', `${base}/api/users/${encodeURIComponent(tr.id)}/swaps?limit=20`, { headers: H });
+    let list = unwrap(j); if (list && !Array.isArray(list)) list = list.items || list.swaps || list.data;
+    if (!Array.isArray(list)) { if (j) schemaWarn('FOMO', 'swaps', j); continue; }
+    parseFomoSwaps(list, tr.handle || String(tr.id));
+  }
+}
+function parseFomoSwaps(list, trader) {
+  const now = Date.now(); let bad = 0;
+  for (const s of list) {
+    const addr = s.tokenAddress || s.mint || s.token?.address || s.token?.mint || s.outputMint || s.toToken?.address || s.baseToken?.address || s.address;
+    const raw = String(s.side || s.type || s.direction || s.action || '').toLowerCase();
+    const side = raw.includes('buy') ? 'buy' : raw.includes('sell') ? 'sell' : null;
+    const ts = parseTs(s.timestamp ?? s.createdAt ?? s.blockTime ?? s.time ?? s.date);
+    if (!addr || !side || !ts) { bad++; continue; }
+    if (now - ts > 30 * 60000) continue;
+    const chain = normChain(s.chain || s.chainId || s.network || 'solana');
+    const t = side === 'buy' ? Disc.see(chain, addr, 'fomo') : S.tokens.get(keyOf(chain, addr));
+    if (t) addFomoEv(t, { ts, trader, usd: num(s.amountUsd ?? s.usdValue ?? s.valueUsd ?? s.usd ?? s.value_usd ?? s.volumeUsd, 0), side });
+  }
+  if (bad && bad === list.length) Log.add('WARN', 'FOMO', 'SCHEMA', 'swaps: не разпознах token/side/time полетата — провери формата', 'keys: ' + Object.keys(list[0] || {}).slice(0, 16).join(','));
+}
+async function enrichDex(tokens) {
+  const byChain = {}; for (const t of tokens) (byChain[t.chain] ||= []).push(t);
+  const jobs = []; for (const [ch, arr] of Object.entries(byChain)) for (let i = 0; i < arr.length; i += 30) jobs.push([ch, arr.slice(i, i + 30)]);
+  for (let i = 0; i < jobs.length; i += 4) {
+    await Promise.all(jobs.slice(i, i + 4).map(async ([ch, arr]) => {
+      const j = await API.get('DEX', `${DEX}/tokens/v1/${ch}/${arr.map(t => t.address).join(',')}`);
+      if (!j) return;
+      const pairs = Array.isArray(j) ? j : (j.pairs || []); if (!Array.isArray(pairs)) { schemaWarn('DEX', 'tokens/v1', j); return; }
+      const best = new Map();
+      for (const p of pairs) { const a = p?.baseToken?.address; if (!a) continue; const k = keyOf(normChain(p.chainId || ch), a); if (!S.tokens.has(k)) continue; const b = best.get(k); if (!b || num(p.liquidity?.usd) > num(b.liquidity?.usd)) best.set(k, p); }
+      for (const t of arr) { const p = best.get(t.key); if (p) applyPair(t, p); else t.miss++; }
+    }));
+  }
+}
+async function liveCycle() {
+  await Promise.allSettled([srcDex(), srcGT(), srcCG(), srcBE(), srcFOMO()]);
+  await enrichDex([...S.tokens.values()]);
+  await enrichGT();
+}
+
+/* =====================================================================
+   SIM — синтетичен пазар със същия формат като DEX Screener.
+   Служи само за тест на логиката (етапи, планове, paper engine). Не се записва.
+   ===================================================================== */
+const Sim = {
+  now: Date.now(), toks: [], traders: ['sol_whale', 'degenmaxi', 'kaito_sniper', 'mintmage', 'pumpmom', 'rektless', 'lowcapgod'],
+  rnd(a, b) { return a + Math.random() * (b - a); },
+  gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); },
+  sym() { const a = ['PEPE', 'BONK', 'CAT', 'DOG', 'WIF', 'MOON', 'FROG', 'GIGA', 'CHAD', 'STONK', 'MEOW', 'ROCKET', 'BASED', 'COPE', 'SEND', 'MOG', 'BRETT', 'NUB', 'GOAT', 'HAWK']; const b = ['', 'AI', 'INU', 'X', '2', 'CAT', 'KING', 'DAO', 'GPT', 'ZILLA']; return a[Math.floor(Math.random() * a.length)] + b[Math.floor(Math.random() * b.length)]; },
+  addr() { const c = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let s = ''; for (let i = 0; i < 40; i++) s += c[Math.floor(Math.random() * c.length)]; return s + 'pump'; },
+  init() { this.now = Date.now(); this.toks = []; for (let i = 0; i < 18; i++) this.spawn(true); },
+  spawn(back) {
+    const types = ['runner', 'runner', 'runner', 'fader', 'fader', 'rug', 'slow', 'dud', 'dud', 'chop'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const age = back ? this.rnd(1, 100) : this.rnd(0, 1.5);
+    const created = this.now - age * 60000; const p = Math.pow(10, this.rnd(-6.5, -2.5)); const liq = this.rnd(16000, 240000);
+    const tok = { sym: this.sym(), addr: this.addr(), type, created, p, liq, supply: liq * this.rnd(3, 12) / p, base: this.rnd(0.6, 1.6), soc: Math.random() < 0.65, h: [], disc: [], rugAt: null, pumpAt: this.rnd(4, 26), phase: 'quiet' };
+    if (type === 'rug') tok.rugAt = tok.pumpAt + this.rnd(10, 30);
+    const steps = Math.floor(age * 2); for (let i = 0; i < steps; i++) this.adv(tok, created + i * 30000);
+    const tags = ['dex_profile', 'dex_boost', 'gt_trend', 'dex_top', 'be_trend', 'dex_cto'];
+    let at = created + this.rnd(0.3, 5) * 60000; tok.disc.push({ tag: Math.random() < 0.6 ? 'gt_new' : 'dex_profile', at });
+    const n = Math.floor(this.rnd(0, 3)); for (let i = 0; i < n; i++) { at += this.rnd(2, 20) * 60000; tok.disc.push({ tag: tags[Math.floor(Math.random() * tags.length)], at }); }
+    this.toks.push(tok);
+  },
+  phase(tok, t) {
+    const m = (t - tok.created) / 60000, P = tok.pumpAt;
+    switch (tok.type) {
+      case 'runner': return m < P ? ['quiet', 0.001, 0.012, 0.5] : m < P + 10 ? ['accum', 0.011, 0.02, 1.4] : m < P + 22 ? ['breakout', 0.026, 0.035, 3] : m < P + 40 ? ['extended', 0.004, 0.05, 2.2] : m < P + 90 ? ['distrib', -0.012, 0.04, 1.3] : ['dead', -0.002, 0.02, 0.25];
+      case 'fader': return m < P ? ['quiet', 0, 0.012, 0.5] : m < P + 8 ? ['pop', 0.014, 0.025, 1.6] : m < P + 60 ? ['fade', -0.008, 0.025, 0.9] : ['dead', -0.002, 0.02, 0.25];
+      case 'rug': return m < P ? ['quiet', 0.001, 0.012, 0.6] : m < tok.rugAt ? ['pump', 0.015, 0.03, 1.8] : ['rugged', -0.01, 0.03, 0.2];
+      case 'slow': return ['grind', 0.0035, 0.015, 0.9];
+      case 'chop': return ['chop', 0, 0.035, 1.1];
+      default: return ['dud', -0.0015, 0.015, 0.35];
+    }
+  },
+  adv(tok, t) {
+    const [ph, drift, vol, act] = this.phase(tok, t); let r = drift + vol * this.gauss();
+    if (tok.type === 'rug' && !tok.rugged && (t - tok.created) / 60000 >= tok.rugAt) { tok.rugged = true; r = -1.9; tok.liq *= 0.08; }
+    tok.p *= Math.exp(r);
+    tok.liq = Math.max(3000, tok.liq * Math.exp(r * 0.45) + (ph === 'accum' || ph === 'breakout' ? this.rnd(0, 1500) : 0));
+    const n = Math.max(0, Math.round(act * tok.base * this.rnd(6, 14) * (1 + Math.abs(r) * 12)));
+    const bs = clamp(0.5 + r * 6 + (ph === 'distrib' || ph === 'fade' ? -0.12 : 0) + (ph === 'accum' ? 0.12 : 0), 0.08, 0.92);
+    const b = Math.round(n * bs), s = n - b, v = n * this.rnd(40, 260) * Math.sqrt(tok.liq / 100000);
+    tok.h.push([t, tok.p, v, b, s, tok.liq]); if (tok.h.length > 2880) tok.h.shift(); tok.phase = ph;
+  },
+  step() {
+    this.now += 30000;
+    for (const tok of this.toks) this.adv(tok, this.now);
+    if (Math.random() < 0.2) this.spawn(false);
+    this.toks = this.toks.filter(tk => this.now - tk.created < 6 * 3600000);
+  },
+  pair(tok) {
+    const h = tok.h, L = h.length; if (!L) return null; const last = h[L - 1];
+    const win = n => { const i0 = Math.max(0, L - n); let v = 0, b = 0, s = 0; for (let i = i0; i < L; i++) { v += h[i][2]; b += h[i][3]; s += h[i][4]; } const p0 = i0 > 0 ? h[i0 - 1][1] : h[0][1]; return { v, b, s, c: (last[1] / p0 - 1) * 100 }; };
+    const m5 = win(10), h1 = win(120), h6 = win(720), h24 = win(2880);
+    return { chainId: 'solana', dexId: 'sim-amm', url: '', pairAddress: 'SIM' + tok.addr.slice(0, 12), baseToken: { address: tok.addr, name: tok.sym + ' (SIM ' + tok.type + ')', symbol: tok.sym }, priceUsd: String(last[1]),
+      txns: { m5: { buys: m5.b, sells: m5.s }, h1: { buys: h1.b, sells: h1.s }, h6: { buys: h6.b, sells: h6.s }, h24: { buys: h24.b, sells: h24.s } },
+      volume: { m5: m5.v, h1: h1.v, h6: h6.v, h24: h24.v }, priceChange: { m5: m5.c, h1: h1.c, h6: h6.c, h24: h24.c },
+      liquidity: { usd: last[5] }, fdv: last[1] * tok.supply, marketCap: last[1] * tok.supply, pairCreatedAt: tok.created, info: { socials: tok.soc ? [{ type: 'x' }] : [], websites: [] }, boosts: { active: 0 } };
+  },
+  cycle() {
+    this.step();
+    for (const tok of this.toks) for (const d of tok.disc) if (!d.done && d.at <= this.now) { d.done = true; Disc.see('solana', tok.addr, d.tag); }
+    for (const tok of this.toks) {
+      const pr = tok.phase === 'accum' ? 0.35 : tok.phase === 'pump' ? 0.2 : (tok.phase === 'quiet' && tok.type === 'runner') ? 0.05 : tok.phase === 'breakout' ? 0.12 : 0;
+      if (Math.random() < pr) { const t = Disc.see('solana', tok.addr, 'fomo'); if (t) addFomoEv(t, { ts: this.now - this.rnd(0, 25000), trader: this.traders[Math.floor(Math.random() * this.traders.length)], usd: this.rnd(40, 2500), side: 'buy' }); }
+    }
+    const by = new Map(this.toks.map(x => [x.addr, x]));
+    for (const t of S.tokens.values()) {
+      const tok = by.get(t.address); if (!tok) { t.miss++; continue; }
+      const p = this.pair(tok); if (!p) continue; applyPair(t, p);
+      t.gt = { b5: Math.round(p.txns.m5.buys * 0.72), s5: Math.round(p.txns.m5.sells * 0.85), tx15: null, ts: this.now };
+    }
+  }
+};
+
+/* =====================================================================
+   ENGINE — features → scores → stage → plan → decision
+   Radar Score ≠ Coin Quality: pump сигналът и изпълнимостта се мерят отделно.
+   ===================================================================== */
+function features(t, now) {
+  const m = t.m, P = CFG.plan;
+  const ageMin = m.created ? Math.max(0, (now - m.created) / 60000) : null;
+  const tx5 = m.tx.m5.b + m.tx.m5.s, txH1 = m.tx.h1.b + m.tx.h1.s;
+  const win = clamp(ageMin ?? 60, 5, 60);
+  const rate5 = tx5 / 5, rateH1 = txH1 / win;
+  const txAccel = rateH1 > 0 ? rate5 / rateH1 : (tx5 > 0 ? 3 : 0);
+  const volAvg5 = m.vol.h1 / (win / 5);
+  const volAccel = volAvg5 > 0 ? m.vol.m5 / volAvg5 : (m.vol.m5 > 0 ? 3 : 0);
+  const bsr5 = (m.tx.m5.b + 1) / (m.tx.m5.s + 1), bsrH1 = (m.tx.h1.b + 1) / (m.tx.h1.s + 1), bsr24 = (m.tx.h24.b + 1) / (m.tx.h24.s + 1);
+  const runup = Math.max(m.chg.h1 || 0, (m.chg.h6 || 0) * 0.6);
+  let hi = m.price; for (let i = t.hist.length - 1; i >= 0; i--) { const h = t.hist[i]; if (now - h[0] > 3600000) break; if (h[1] > hi) hi = h[1]; }
+  const fs = fomoStats(t, now);
+  return {
+    ageMin, tx5, txH1, txAccel, volAccel, bsr5, bsrH1, bsr24, runup, hi,
+    dd: hi > 0 ? (m.price / hi - 1) * 100 : 0,
+    liqMc: m.mc > 0 ? m.liq / m.mc : null,
+    turnover: m.liq > 0 ? m.vol.h24 / m.liq : null,
+    volLiqH1: m.liq > 0 ? m.vol.h1 / m.liq : null,
+    avgTrade5: tx5 > 0 ? m.vol.m5 / tx5 : null,
+    volUnit: clamp(Math.abs(m.chg.m5 || 0) * 0.8 + Math.abs(m.chg.h1 || 0) / 6, P.volMin, P.volMax),
+    slipPaper: slip(CFG.paper.size, m.liq), slipRef: slip(CFG.paper.refSize, m.liq),
+    liqDropPeak: t.liqPeak > 0 ? (m.liq / t.liqPeak - 1) * 100 : 0,
+    srcRecent: Object.values(t.srcLast).filter(ts => now - ts < 30 * 60000).length,
+    fomoBuys5: fs.b5, fomoBuys15: fs.b15, fomoTraders: fs.tr15, fomoNet: fs.net15, fomoLast: fs.last,
+    noSells: m.tx.m5.b >= 25 && m.tx.m5.s === 0
+  };
+}
+function baseScores(t, f) {
+  const m = t.m, c = m.chg;
+  const momentum = clamp(sig((0.6 * (c.m5 || 0) + 0.25 * (c.h1 || 0)) / 15), 0, 100);
+  const volume = clamp(((Math.log10(m.vol.h1 + 1) - 3) / 3.5) * 80 + clamp(f.volAccel - 1, 0, 3) * 6.7, 0, 100);
+  const flow = clamp(50 + 40 * Math.tanh(Math.log(f.bsr5)) + 10 * Math.tanh(Math.log(f.bsrH1)), 0, 100);
+  const liq = clamp((Math.log10(m.liq + 1) - 4) / 2.5 * 100, 0, 100);
+  const activity = sig(f.txAccel - 1), accel = sig(f.volAccel - 1);
+  const a = f.ageMin; const youth = a == null ? 50 : a < 5 ? 75 : a <= 90 ? 100 : a <= 360 ? 65 : a <= 1440 ? 40 : 25;
+  const src = clamp(f.srcRecent * 18 + f.fomoTraders * 12, 0, 100);
+  const breadth = t.gt && t.gt.b5 != null ? clamp(50 + 40 * Math.tanh(Math.log((t.gt.b5 + 1) / ((t.gt.s5 ?? 0) + 1))), 0, 100) : null;
+  const runPen = f.runup > 60 ? Math.min(30, (f.runup - 60) / 5) : 0;
+  const ess = clamp(0.22 * activity + 0.18 * accel + 0.18 * flow + 0.14 * youth + 0.14 * src + 0.14 * Math.min(100, liq * 1.3) - runPen, 0, 100);
+  let risk = 0; const rw = [];
+  if (m.liq < 50000) { risk += 28; rw.push('liq < $50K'); } else if (m.liq < 150000) { risk += 12; rw.push('liq < $150K'); }
+  if (f.liqMc != null && f.liqMc < 0.05) { risk += 12; rw.push('liq/MC < 5%'); }
+  if (a != null && a < 10) { risk += 12; rw.push('age < 10m'); }
+  if (!m.socials && !m.websites) { risk += 8; rw.push('no socials/site'); }
+  if (t.sec) {
+    if (t.sec.top10 > 40) { risk += 18; rw.push('top10 > 40%'); } else if (t.sec.top10 > 25) { risk += 8; rw.push('top10 > 25%'); }
+    if (t.sec.freeze) { risk += 25; rw.push('freeze authority'); }
+    if (t.sec.mutable) { risk += 5; rw.push('mutable metadata'); }
+  }
+  if (f.turnover != null && f.turnover > 40) { risk += 10; rw.push('turnover > 40x (wash?)'); }
+  if (f.noSells) { risk += 25; rw.push('no sells 5m'); }
+  if (f.liqDropPeak < -25) { risk += 25; rw.push('liq pulled > 25%'); } else if (f.liqDropPeak < -10) { risk += 10; rw.push('liq −10% from peak'); }
+  return { momentum, volume, flow, liq, activity, accel, youth, src, breadth, ess, risk: clamp(risk, 0, 100), riskWhy: rw, slipRisk: clamp(f.slipRef * 14, 0, 100), pumpSignal: Math.max(momentum, (volume + activity) / 2) };
+}
+function stageOf(t, f, s) {
+  const c = t.m.chg, r = f.runup;
+  if ((r > 60 && ((c.m5 || 0) < -5 || f.dd < -30) && s.flow < 50) || f.dd < -45) return 5;
+  if (r > 150 || (r > 80 && f.volAccel < 0.9)) return 4;
+  if ((c.m5 || 0) > 10 || (r >= 60 && f.volAccel >= 1)) return 3;
+  if (r >= 25 || ((c.m5 || 0) > 4 && s.flow > 55)) return 2;
+  if (f.txAccel > 1.3 || f.volAccel > 1.3 || f.srcRecent >= 2 || f.fomoTraders > 0) return 1;
+  return 0;
+}
+function finalScores(t, f, s, now) {
+  const st = t.stage;
+  const stageQ = [40, 80, 100, 70, 25, 0][st], stageFit = [45, 100, 90, 55, 10, 0][st];
+  s.pq = clamp(0.28 * s.flow + 0.2 * s.activity + 0.2 * s.volume + 0.14 * (s.breadth ?? 50) + 0.18 * stageQ, 0, 100);
+  let copy = 100 - s.slipRisk * 0.35 - clamp((f.volUnit - 4) * 3, 0, 25);
+  if (t.plan) {
+    const mv = (t.m.price / t.plan.p0 - 1) * 100; copy -= clamp(mv * 2, 0, 40);
+    if (t.entryState === 'CHASED') copy -= 25;
+    copy -= clamp(((now - t.plan.createdAt) / 60000 - 2) * 1.2, 0, 20);
+  }
+  if (t.m.liq < CFG.gates.minLiq) copy -= 20;
+  s.copy = clamp(copy, 0, 100);
+  s.radar = clamp(0.3 * s.ess + 0.2 * s.pq + 0.2 * s.copy + 0.15 * (100 - s.risk) + 0.15 * stageFit, 0, 100);
+}
+function edgeOf(t) {
+  const fs = t.firstSnap; if (!fs || !t.m) return { edge: '—' };
+  const E = CFG.edge, runDet = Math.max(0, fs.chgH1 || 0);
+  const ref = t.paperFillPrice || t.m.price, move = (ref / fs.price - 1) * 100;
+  const lead = (t.t.paperFill || Clock.now()) - (t.t.firstDetected || fs.ts);
+  const edge = (runDet >= E.lostRunup || move >= E.lostMove) ? 'LOST' : (runDet < E.goodRunup && move < E.goodMove) ? 'GOOD' : 'FAIR';
+  return { edge, runDet, move, lead, filled: !!t.paperFillPrice };
+}
+/* --- ENTRY / CHASE / TP / SL --- */
+function lockPlan(p) { return fnv1a(JSON.stringify([p.p0, p.entryLow, p.entryHigh, p.chase, p.sl, p.tp, p.createdAt])); }
+function makePlan(t, now) {
+  const P = CFG.plan, p0 = t.m.price, v = t.f.volUnit;
+  const entryHigh = p0 * (1 - P.zoneTop * v / 100), entryLow = p0 * (1 - P.zoneBottom * v / 100), mid = (entryHigh + entryLow) / 2;
+  const slPct = clamp(P.slMult * v, P.slMin, P.slMax), sl = mid * (1 - slPct / 100), R = mid - sl;
+  const plan = { createdAt: now, p0, vol: v, entryLow, entryHigh, mid, chase: p0 * (1 + P.chase * v / 100), sl, slPct, tp: P.tpR.map(r => mid + r * R), tpR: [...P.tpR], ttlMin: P.ttlMin, liqAt: t.m.liq, liqInvalid: t.m.liq * 0.65, stageAt: t.stage, radarAt: t.s.radar };
+  plan.lock = lockPlan(plan); return plan;
+}
+function entryStateOf(t, p, now) {
+  const px = t.m.price;
+  if (now - p.createdAt > p.ttlMin * 60000) return 'EXPIRED';
+  if (px <= p.sl) return 'INVALID-SL';
+  if (t.m.liq < p.liqInvalid) return 'INVALID-LIQ';
+  if (px > p.chase) return 'CHASED';
+  if (px <= p.entryHigh) return 'IN ZONE';
+  return 'ABOVE ZONE';
+}
+function managePlan(t, now) {
+  let p = t.plan;
+  if (p) {
+    const st = entryStateOf(t, p, now);
+    if (st === 'EXPIRED' || st.startsWith('INVALID')) {
+      p.endedAt = now; p.endState = st; t.planHist.push(p); if (t.planHist.length > 8) t.planHist.shift();
+      t.planCooldown = now + CFG.plan.cooldownMin * 60000;
+      Tape.add('PLAN', `${t.symbol} plan ${st}`, t.key, 'mut'); t.plan = p = null;
+    }
+  }
+  if (!p && t.s.radar >= CFG.gates.qualify && t.stage >= 1 && t.stage <= 3 && t.s.risk < CFG.gates.maxTokenRisk && !(t.planCooldown > now)) {
+    t.plan = p = makePlan(t, now);
+    if (!t.t.radarQualified) t.t.radarQualified = now;
+    Tape.add('QUAL', `${t.symbol} QUALIFIED · radar ${Math.round(t.s.radar)} · plan ${p.lock}`, t.key, 'cy');
+  }
+  t.entryState = p ? entryStateOf(t, p, now) : 'NO PLAN';
+  if (t.entryState === 'IN ZONE' && !t.t.entryAvailable) t.t.entryAvailable = now;
+}
+function decide(t) {
+  const s = t.s, f = t.f, m = t.m, g = CFG.gates; const R = [];
+  if (m.liq < g.minLiq) R.push(`liq ${F.usd(m.liq)} < ${F.usd(g.minLiq)}`);
+  if (s.risk >= g.maxTokenRisk) R.push(`token risk ${Math.round(s.risk)}`);
+  if (s.slipRisk >= g.maxSlipRisk) R.push(`slippage risk ${Math.round(s.slipRisk)}`);
+  if (f.ageMin != null && f.ageMin < g.minAgeMin) R.push(`age < ${g.minAgeMin}m`);
+  if (f.noSells) R.push('no sells (honeypot?)');
+  let d, why = R;
+  if (R.length) d = 'REJECT';
+  else if (t.stage >= 4) { d = 'TOO LATE'; why = [STAGES[t.stage] + ' — no chase']; }
+  else if (t.edge.edge === 'LOST' && !t.edge.filled) { d = 'TOO LATE'; why = [t.edge.runDet >= CFG.edge.lostRunup ? `detected late (Δ1h ${F.pct(t.edge.runDet, 0)} at detection)` : `moved ${F.pct(t.edge.move, 0)} since detection`]; }
+  else if (t.entryState === 'CHASED') { d = 'TOO LATE'; why = ['price > chase limit — wait for retest']; }
+  else if (t.plan && s.radar >= g.paper && s.copy >= g.minCopy && (t.stage === 1 || t.stage === 2 || (t.stage === 3 && g.allowStage3))) { d = 'ALLOW PAPER'; why = []; }
+  else {
+    d = 'WATCH'; why = [];
+    if (!t.plan) why.push(s.radar < g.qualify ? `radar ${Math.round(s.radar)} < qualify ${g.qualify}` : t.planCooldown > Clock.now() ? 'plan cooldown' : 'no plan');
+    else { if (s.radar < g.paper) why.push(`radar ${Math.round(s.radar)} < paper ${g.paper}`); if (s.copy < g.minCopy) why.push(`copyability ${Math.round(s.copy)} < ${g.minCopy}`); if (t.stage === 3 && !g.allowStage3) why.push('BREAKOUT — paper off (config)'); if (t.stage === 0) why.push('no early activity'); }
+  }
+  t.reasons = why; t.investigate = s.radar >= g.investigate && d !== 'REJECT';
+  if (t.decision !== d) {
+    if (d === 'ALLOW PAPER') Tape.add('ALLOW', `${t.symbol} ALLOW PAPER · radar ${Math.round(s.radar)} · zone ${F.px(t.plan.entryLow)}–${F.px(t.plan.entryHigh)}`, t.key, 'up');
+    else if (d === 'TOO LATE' && t.entryState === 'CHASED') Tape.add('CHASE', `${t.symbol} ENTRY INVALID ${F.pct((m.price / t.plan.p0 - 1) * 100)} — DO NOT CHASE`, t.key, 'amb');
+    else if (d === 'REJECT' && t.decision) Tape.add('REJECT', `${t.symbol} REJECT · ${R[0]}`, t.key, 'dn');
+    t.decision = d;
+  }
+}
+const Engine = {
+  one(t, now) {
+    const f = t.f = features(t, now);
+    const s = t.s = baseScores(t, f);
+    const stage = stageOf(t, f, s);
+    if (t.stage !== undefined && stage !== t.stage && t.symbol) Tape.add('STAGE', `${t.symbol} → ${STAGES[stage]}`, t.key, stage >= 4 ? 'amb' : stage >= 2 ? 'up' : 'cy');
+    t.stage = stage; t.stageMax = Math.max(t.stageMax || 0, stage);
+    finalScores(t, f, s, now);
+    managePlan(t, now);
+    t.edge = edgeOf(t);
+    decide(t);
+    ESDB.onFirst(t);
+  },
+  all() { const now = Clock.now(); for (const t of S.tokens.values()) { if (!t.m || !(t.m.price > 0)) continue; try { this.one(t, now); } catch (e) { Log.add('ERROR', 'APP', 'ENGINE', `${t.symbol || t.key}: ${e.message}`, e.stack); } } }
+};
+
+/* =====================================================================
+   PAPER ENGINE — TP/SL се заключват при входа (LOCK hash), не се местят.
+   Единственото движение на SL е предварително зададеното правило:
+   TP1 → SL = break-even, TP2 → SL = TP1.
+   ===================================================================== */
+const Paper = {
+  lockOf(pos) { return fnv1a(JSON.stringify([pos.entry, pos.plan.sl, pos.plan.tp, pos.rules, pos.openedAt, pos.size])); },
+  verify(pos) { return this.lockOf(pos) === pos.lock; },
+  effSL(pos) { return pos.tpHit[1] ? pos.plan.tp[0] : pos.tpHit[0] ? pos.entry : pos.plan.sl; },
+  tick() {
+    const now = Clock.now();
+    for (const pos of [...S.paper.open]) this.update(pos, now);
+    if (!CFG.paper.auto) return;
+    for (const t of S.tokens.values()) {
+      if (S.paper.open.length >= CFG.paper.maxOpen) break;
+      if (t.decision !== 'ALLOW PAPER' || t.entryState !== 'IN ZONE' || !t.plan) continue;
+      if (S.paper.open.some(p => p.key === t.key) || t.lastTradedLock === t.plan.lock) continue;
+      this.open(t, 'auto');
+    }
+  },
+  open(t, how) {
+    const now = Clock.now(), m = t.m; if (!m || !t.f) return null;
+    const plan = t.plan || makePlan(t, now);
+    const slipIn = slip(CFG.paper.size, m.liq), entry = m.price * (1 + slipIn / 100);
+    const P = { sl: plan.sl, tp: [...plan.tp], mid: plan.mid, entryLow: plan.entryLow, entryHigh: plan.entryHigh, chase: plan.chase, p0: plan.p0, planLock: plan.lock };
+    let R = entry - P.sl; if (!(R > 0)) { R = entry * plan.slPct / 100; P.sl = entry - R; }
+    const rules = { tpFrac: [...CFG.paper.tpFrac], timeStopMin: CFG.paper.timeStopMin, timeStopR: CFG.paper.timeStopR, liqStopPct: CFG.paper.liqStopPct, maxHoldMin: CFG.paper.maxHoldMin, trail: 'TP1→SL=BE · TP2→SL=TP1' };
+    const e = edgeOf(t);
+    const pos = { id: uid(), key: t.key, symbol: t.symbol, chain: t.chain, address: t.address, how, openedAt: now, entry, px0: m.price, slipIn, size: CFG.paper.size, R, plan: P, rules, liqAtEntry: m.liq, left: 1, tpHit: [false, false, false], exits: [], mfe: 0, mae: 0, last: m.price, lastTs: now, lastUpd: m.updated, chased: t.entryState === 'CHASED', planned: !!t.plan,
+      snap: { stage: t.stage, decision: t.decision, entryState: t.entryState, radar: t.s.radar, ess: t.s.ess, pq: t.s.pq, copy: t.s.copy, risk: t.s.risk, edge: e.edge, runDet: e.runDet, moveDet: e.move, leadMs: now - (t.t.firstDetected || now), liq: m.liq, mc: m.mc, volUnit: t.f.volUnit, times: { ...t.t, paperFill: now }, sources: Object.keys(t.sources) } };
+    pos.lock = this.lockOf(pos);
+    S.paper.open.push(pos); t.lastTradedLock = plan.lock; if (!t.t.paperFill) t.t.paperFill = now; t.paperFillPrice = entry;
+    Tape.add('FILL', `${t.symbol} PAPER ${how.toUpperCase()} $${CFG.paper.size} @ ${F.px(entry)} · SL ${F.px(P.sl)} · TP1 ${F.px(P.tp[0])}`, t.key, 'up');
+    return pos;
+  },
+  update(pos, now) {
+    const t = S.tokens.get(pos.key);
+    if (!t || !t.m || !(t.m.price > 0)) { if (now - pos.lastTs > 20 * 60000 && !pos.staleWarned) { pos.staleWarned = true; Log.add('WARN', 'APP', 'STALE', `${pos.symbol}: няма нова цена от ${F.dur(now - pos.lastTs)} — позицията не може да се следи`, pos.key); } return; }
+    if (t.m.updated === pos.lastUpd) return;
+    pos.lastUpd = t.m.updated; pos.staleWarned = false;
+    const px = t.m.price; pos.last = px; pos.lastTs = now;
+    const ch = (px / pos.entry - 1) * 100; pos.mfe = Math.max(pos.mfe, ch); pos.mae = Math.min(pos.mae, ch);
+    const out = slip(pos.size, t.m.liq) / 100, sl = this.effSL(pos);
+    if (px <= sl) return this.exit(pos, px * (1 - out), pos.tpHit[1] ? 'TRAIL STOP' : pos.tpHit[0] ? 'BE STOP' : 'HARD SL', now);
+    if (t.m.liq < pos.liqAtEntry * (1 - pos.rules.liqStopPct / 100)) return this.exit(pos, px * (1 - out * 2), 'LIQ STOP', now);
+    for (let i = 0; i < 3; i++) {
+      if (pos.tpHit[i] || px < pos.plan.tp[i]) continue;
+      pos.tpHit[i] = true; const frac = i === 2 ? pos.left : Math.min(pos.left, pos.rules.tpFrac[i]);
+      this.partial(pos, pos.plan.tp[i] * (1 - CFG.paper.feePct / 100), frac, 'TP' + (i + 1), now);
+      if (pos.left <= 1e-9) return this.close(pos, now, 'TP' + (i + 1));
+    }
+    const held = (now - pos.openedAt) / 60000, rNow = (px - pos.entry) / pos.R;
+    if (!pos.tpHit[0] && held >= pos.rules.timeStopMin && rNow < pos.rules.timeStopR) return this.exit(pos, px * (1 - out), 'TIME STOP', now);
+    if (held >= pos.rules.maxHoldMin) return this.exit(pos, px * (1 - out), 'MAX HOLD', now);
+  },
+  partial(pos, px, frac, reason, now) {
+    pos.exits.push({ ts: now, px, frac, reason }); pos.left = Math.max(0, pos.left - frac);
+    const extra = reason === 'TP1' && pos.left > 0 ? ' · SL → BE' : reason === 'TP2' && pos.left > 0 ? ' · SL → TP1' : '';
+    Tape.add('EXIT', `${pos.symbol} ${reason} ${Math.round(frac * 100)}% @ ${F.px(px)}${extra}`, pos.key, reason.startsWith('TP') ? 'up' : 'dn');
+  },
+  exit(pos, px, reason, now) { if (pos.left > 0) this.partial(pos, px, pos.left, reason, now); this.close(pos, now, reason); },
+  close(pos, now, reason) {
+    const pnlPct = pos.exits.reduce((a, e) => a + e.frac * (e.px / pos.entry - 1), 0) * 100;
+    const rMult = pos.exits.reduce((a, e) => a + e.frac * (e.px - pos.entry), 0) / pos.R;
+    Object.assign(pos, { closedAt: now, exitReason: reason, pnlPct, pnlUsd: pos.size * pnlPct / 100, rMult, holdMin: (now - pos.openedAt) / 60000 });
+    S.paper.open = S.paper.open.filter(p => p.id !== pos.id); S.paper.closed.unshift(pos);
+    Tape.add('CLOSE', `${pos.symbol} CLOSED ${reason} · ${F.r(rMult)} · ${F.pct(pnlPct)}`, pos.key, rMult >= 0 ? 'up' : 'dn');
+  },
+  manualClose(id) {
+    const pos = S.paper.open.find(p => p.id === id); if (!pos) return;
+    const t = S.tokens.get(pos.key); const px = t?.m?.price || pos.last; const liq = t?.m?.liq || pos.liqAtEntry;
+    this.exit(pos, px * (1 - slip(pos.size, liq) / 100), 'MANUAL CLOSE', Clock.now());
+  }
+};
+function paperStats(list) {
+  const n = list.length; if (!n) return { n: 0, curve: [] };
+  const sorted = [...list].sort((a, b) => a.closedAt - b.closedAt);
+  let cum = 0, peak = 0, mdd = 0; const curve = [];
+  for (const p of sorted) { cum += p.rMult; curve.push(cum); peak = Math.max(peak, cum); mdd = Math.min(mdd, cum - peak); }
+  const wins = list.filter(p => p.rMult > 0), gw = wins.reduce((a, p) => a + p.pnlUsd, 0), gl = list.filter(p => p.rMult <= 0).reduce((a, p) => a + p.pnlUsd, 0);
+  const avg = fn => list.reduce((a, p) => a + fn(p), 0) / n;
+  return { n, win: wins.length / n * 100, avgR: avg(p => p.rMult), sumR: cum, pnl: list.reduce((a, p) => a + p.pnlUsd, 0), pf: gl < 0 ? gw / Math.abs(gl) : null, hold: avg(p => p.holdMin), mfe: avg(p => p.mfe), mae: avg(p => p.mae), best: Math.max(...list.map(p => p.rMult)), worst: Math.min(...list.map(p => p.rMult)), mdd, curve };
+}
+function groupStats(list, fn) {
+  const g = new Map(); for (const p of list) { const k = fn(p); if (!g.has(k)) g.set(k, []); g.get(k).push(p); }
+  return [...g.entries()].map(([k, arr]) => ({ k, ...paperStats(arr) })).sort((a, b) => b.n - a.n);
+}
+
+/* =====================================================================
+   MISSED / CHASED — мери дали правилото "DO NOT CHASE" е правилно
+   ===================================================================== */
+const Missed = {
+  tick() {
+    const now = Clock.now();
+    for (const t of S.tokens.values()) {
+      if (!t.s || !t.m) continue;
+      if (t.plan && t.entryState === 'CHASED' && t.missedLock !== t.plan.lock && !S.paper.open.some(p => p.key === t.key)) {
+        t.missedLock = t.plan.lock; const p = t.plan;
+        this.add(t, 'CHASED', (p.tp[0] / p.mid - 1) * 100, (1 - p.sl / p.mid) * 100, p.chase, p.entryHigh);
+      }
+      if (t.stage >= 4 && !t.missedStage && t.s.pumpSignal >= 70) {
+        t.missedStage = true; const down = clamp(CFG.plan.slMult * t.f.volUnit, CFG.plan.slMin, CFG.plan.slMax);
+        this.add(t, 'LATE STAGE', down * CFG.plan.tpR[0], down, null, null);
+      }
+    }
+    for (const r of S.missed) {
+      if (r.done) continue;
+      const el = (now - r.at) / 60000, t = S.tokens.get(r.key);
+      if (!t || !t.m) { if (el > 90) { r.done = true; r.verdict = 'NO DATA'; } continue; }
+      const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
+      if (r.entryHigh && px <= r.entryHigh) r.retest = true;
+      if (!r.first) { if (px >= r.px * (1 + r.up / 100)) r.first = 'UP'; else if (px <= r.px * (1 - r.down / 100)) r.first = 'DOWN'; }
+      for (const cp of [5, 15, 60]) if (el >= cp && r.out['r' + cp] == null) r.out['r' + cp] = (px / r.px - 1) * 100;
+      if (el >= 60) { r.done = true; r.out.max = (r.max / r.px - 1) * 100; r.out.min = (r.min / r.px - 1) * 100; r.verdict = r.first === 'DOWN' ? 'RULE SAVED' : r.first === 'UP' ? 'MISSED WIN' : 'FLAT'; }
+    }
+  },
+  add(t, type, up, down, chase, entryHigh) {
+    S.missed.unshift({ id: uid(), key: t.key, symbol: t.symbol, chain: t.chain, type, at: Clock.now(), px: t.m.price, chase, entryHigh, stage: t.stage, radar: t.s.radar, pump: t.s.pumpSignal, up, down, out: {}, max: t.m.price, min: t.m.price, first: null, retest: false, done: false });
+    if (S.missed.length > 1500) S.missed.length = 1500;
+  }
+};
+
+/* =====================================================================
+   EARLY SIGNAL DATABASE — кои ранни признаци наистина предхождат pump
+   ===================================================================== */
+const ESDB = {
+  onFirst(t) {
+    if (t.esdbId || !t.f || !t.s || !t.firstSnap) return;
+    if (t.m.liq < CFG.filters.minLiqDiscovery) { t.esdbId = 'skip'; return; }
+    const f = t.f, s = t.s, m = t.m;
+    const r = { id: uid(), key: t.key, symbol: t.symbol, chain: t.chain, ts: t.t.firstDetected || Clock.now(), p0: m.price, src: Object.keys(t.sources), nSrc: Object.keys(t.sources).length, ageMin: f.ageMin, liq: m.liq, mc: m.mc, vol5: m.vol.m5, volH1: m.vol.h1, bsr5: f.bsr5, txAccel: f.txAccel, volAccel: f.volAccel, ess: s.ess, stage: t.stage, chgM5: m.chg.m5, chgH1: m.chg.h1, fomoTraders: f.fomoTraders, risk: s.risk, out: {}, max: m.price, min: m.price, done: false };
+    S.esdb.unshift(r); t.esdbId = r.id; if (S.esdb.length > CFG.esdb.cap) S.esdb.length = CFG.esdb.cap;
+  },
+  tick() {
+    const now = Clock.now();
+    for (const r of S.esdb) {
+      if (r.done) continue;
+      const el = (now - r.ts) / 60000, t = S.tokens.get(r.key);
+      if (t && t.m && t.m.price > 0) {
+        const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
+        for (const cp of [5, 15, 60]) if (el >= cp && r.out['r' + cp] == null) r.out['r' + cp] = (px / r.p0 - 1) * 100;
+        if (el >= 60) { r.out.max60 = (r.max / r.p0 - 1) * 100; r.out.min60 = (r.min / r.p0 - 1) * 100; r.done = true; }
+      }
+      if (!r.done && el > 90) { r.done = true; r.expired = true; }
+    }
+  },
+  analysis() {
+    const done = S.esdb.filter(r => r.done && !r.expired && r.out.max60 != null);
+    const hitP = CFG.esdb.hitPct, susP = CFG.esdb.sustainPct;
+    const isHit = r => r.out.max60 >= hitP, isSus = r => r.out.r60 >= susP;
+    const rate = (a, fn) => a.length ? a.filter(fn).length / a.length * 100 : null;
+    const avg = a => a.length ? a.reduce((x, r) => x + r.out.r60, 0) / a.length : null;
+    const feats = [['ess', 'Early Signal Score'], ['txAccel', 'Tx acceleration'], ['volAccel', 'Volume acceleration'], ['bsr5', 'Buy/Sell 5m'], ['vol5', 'Volume 5m'], ['liq', 'Liquidity'], ['ageMin', 'Pair age (min)'], ['chgH1', 'Δ1h at detection'], ['nSrc', 'Sources count'], ['fomoTraders', 'FOMO traders 15m'], ['risk', 'Token risk']];
+    const rows = feats.map(([k, label]) => {
+      const v = done.filter(r => r[k] != null && isFinite(r[k])); if (v.length < 6) return { k, label, n: v.length };
+      const sorted = v.map(r => r[k]).sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)];
+      const hi = v.filter(r => r[k] > med), lo = v.filter(r => r[k] <= med);
+      const hH = rate(hi, isHit), hL = rate(lo, isHit);
+      return { k, label, n: v.length, med, hitHi: hH, hitLo: hL, susHi: rate(hi, isSus), susLo: rate(lo, isSus), r60Hi: avg(hi), r60Lo: avg(lo), lift: hH != null && hL != null ? hH - hL : null, nHi: hi.length, nLo: lo.length };
+    }).sort((a, b) => Math.abs(b.lift ?? -1) - Math.abs(a.lift ?? -1));
+    const buckets = [[0, 40], [40, 60], [60, 75], [75, 101]].map(([a, b]) => { const arr = done.filter(r => r.ess >= a && r.ess < b); return { label: `${a}–${Math.min(b, 100)}`, n: arr.length, hit: rate(arr, isHit), sus: rate(arr, isSus), r60: avg(arr), max60: arr.length ? arr.reduce((x, r) => x + r.out.max60, 0) / arr.length : null }; });
+    return { n: done.length, total: S.esdb.length, pending: S.esdb.filter(r => !r.done).length, base: { hit: rate(done, isHit), sus: rate(done, isSus), r60: avg(done) }, rows, buckets };
+  }
+};
+
+/* =====================================================================
+   RESEARCH & TRACKING + HANDOFF КЪМ FOMO TEST AGENT
+   ===================================================================== */
+const Research = {
+  add(t, note) {
+    let r = S.research.find(x => x.key === t.key);
+    if (!r) {
+      r = { id: uid(), key: t.key, chain: t.chain, address: t.address, symbol: t.symbol || F.short(t.address), status: 'WATCH', thesis: '', tags: '', notes: [], track: true, createdAt: Date.now(), priceAtAdd: t.m?.price ?? null, radarAtAdd: t.s?.radar ?? null, stageAtAdd: t.stage ?? null };
+      S.research.unshift(r); Tape.add('RESEARCH', `${r.symbol} добавен в research`, t.key, 'vi');
+    }
+    if (note) r.notes.unshift({ ts: Date.now(), text: note });
+    return r;
+  },
+  get(id) { return S.research.find(r => r.id === id); }
+};
+function handoff(t) {
+  const r = Research.add(t); r.status = 'INVESTIGATING'; r.notes.unshift({ ts: Date.now(), text: 'Изпратен към FOMO Test Agent (handoff JSON)' });
+  const payload = {
+    schema: 'pumpcall.handoff.v1', createdAt: new Date().toISOString(), radarVersion: VERSION, mode: CFG.mode,
+    token: { chain: t.chain, address: t.address, symbol: t.symbol, name: t.name, pair: t.pairAddress, dex: t.dexId, url: t.url },
+    market: t.m, features: t.f, scores: t.s, stage: STAGES[t.stage], decision: t.decision, reasons: t.reasons, entryState: t.entryState,
+    plan: t.plan, timestamps: t.t, earlyEdge: t.edge, sources: t.sources, fomo: fomoStats(t), security: t.sec || null,
+    research: { status: r.status, thesis: r.thesis, tags: r.tags, notes: r.notes },
+    investigate: ['Contract: mint / freeze authority', 'Holders & concentration', 'Dev / creator wallets & history', 'Pools, LP lock, liquidity changes', 'Whales & smart-money flow', 'Social narrative (X, Telegram, Discord)', 'Suspicious transfers / exit liquidity', 'Copyability of the traders involved']
+  };
+  const txt = JSON.stringify(payload, null, 2);
+  try { navigator.clipboard && navigator.clipboard.writeText(txt).catch(() => { }); } catch (e) { }
+  download(`handoff_${(t.symbol || 'token').replace(/[^\w-]/g, '')}_${Date.now()}.json`, txt);
+  Tape.add('AGENT', `${t.symbol} → FOMO TEST AGENT (handoff)`, t.key, 'vi');
+}
+
+/* =====================================================================
+   UNIVERSE HYGIENE + PERSISTENCE
+   ===================================================================== */
+function prune() {
+  const now = Clock.now();
+  const keep = new Set([...S.paper.open.map(p => p.key), ...S.research.filter(r => r.track).map(r => r.key), ...S.esdb.filter(e => !e.done).map(e => e.key), ...S.missed.filter(m => !m.done).map(m => m.key)]);
+  if (S.sel) keep.add(S.sel);
+  for (const [k, t] of S.tokens) {
+    if (keep.has(k)) continue;
+    let drop = false;
+    if (!t.m) drop = t.miss >= 3;
+    else {
+      if (t.m.liq < CFG.filters.minLiqDiscovery && now - (t.t.firstDetected || now) > 10 * 60000) drop = true;
+      if (t.f && t.f.ageMin != null && t.f.ageMin > CFG.filters.maxAgeH * 60) drop = true;
+      if (now - t.m.updated > 15 * 60000) drop = true;
+    }
+    if (drop) S.tokens.delete(k);
+  }
+  if (S.tokens.size > CFG.filters.universeCap) {
+    const arr = [...S.tokens.values()].filter(t => !keep.has(t.key)).sort((a, b) => (a.s?.radar ?? -1) - (b.s?.radar ?? -1));
+    while (S.tokens.size > CFG.filters.universeCap && arr.length) S.tokens.delete(arr.shift().key);
+  }
+}
+function tokenMeta() {
+  return [...S.tokens.values()].slice(0, 400).map(t => ({ key: t.key, chain: t.chain, address: t.address, symbol: t.symbol, name: t.name, sources: t.sources, t: t.t, firstSnap: t.firstSnap, plan: t.plan, planHist: t.planHist.slice(-5), stageMax: t.stageMax, esdbId: t.esdbId, liqPeak: t.liqPeak, sec: t.sec, lastTradedLock: t.lastTradedLock, missedLock: t.missedLock, missedStage: t.missedStage, paperFillPrice: t.paperFillPrice, fomo: t.fomo }));
+}
+function persist(force) {
+  if (CFG.mode === 'sim') return;
+  const now = Date.now(); if (!force && now - S.lastPersist < 5000) return; S.lastPersist = now;
+  Store.set('paper', S.paper); Store.set('missed', S.missed.slice(0, 1500)); Store.set('esdb', S.esdb.slice(0, CFG.esdb.cap));
+  Store.set('research', S.research); Store.set('errors', S.errors.slice(0, 1000)); Store.set('events', S.events.slice(0, 200)); Store.set('tokens', tokenMeta());
+}
+function loadState() {
+  if (CFG.mode === 'sim') return;
+  S.paper = Store.get('paper', { open: [], closed: [] }); S.missed = Store.get('missed', []); S.esdb = Store.get('esdb', []);
+  S.research = Store.get('research', []); S.errors = Store.get('errors', []); S.events = Store.get('events', []);
+  for (const m of Store.get('tokens', [])) {
+    if (!m || !m.key) continue;
+    const t = newToken(m.key, m.chain, m.address);
+    Object.assign(t, { symbol: m.symbol || '', name: m.name || '', sources: m.sources || {}, t: { ...t.t, ...(m.t || {}) }, firstSnap: m.firstSnap, plan: m.plan, planHist: m.planHist || [], stageMax: m.stageMax || 0, esdbId: m.esdbId, liqPeak: m.liqPeak, sec: m.sec, lastTradedLock: m.lastTradedLock, missedLock: m.missedLock, missedStage: m.missedStage, paperFillPrice: m.paperFillPrice, fomo: m.fomo && Array.isArray(m.fomo.ev) ? m.fomo : { ev: [] } });
+    S.tokens.set(m.key, t);
+  }
+  for (const r of S.research) if (r.track && !S.tokens.has(r.key)) S.tokens.set(r.key, newToken(r.key, r.chain, r.address));
+}
+function backupObj() { return { schema: 'pumpcall.backup.v1', exportedAt: new Date().toISOString(), version: VERSION, mode: CFG.mode, cfg: CFG, paper: S.paper, missed: S.missed, esdb: S.esdb, research: S.research, errors: S.errors, events: S.events, tokens: tokenMeta() }; }
+
+/* =====================================================================
+   MAIN CYCLE
+   ===================================================================== */
+async function cycle() {
+  if (S.scanning) return;
+  S.scanning = true; const t0 = performance.now();
+  S.nextAt = Date.now() + (CFG.mode === 'sim' ? CFG.sim.tickMs : CFG.refreshSec * 1000);
+  try {
+    if (CFG.mode === 'sim') Sim.cycle(); else await liveCycle();
+    Engine.all(); Paper.tick(); Missed.tick(); ESDB.tick(); prune();
+    S.cycles++; persist();
+  } catch (e) { Log.add('ERROR', 'APP', 'CYCLE', e.message, e.stack); }
+  finally {
+    S.scanning = false; S.lastScanMs = performance.now() - t0; S.lastScan = Date.now();
+    try { UI.render(); } catch (e) { Log.add('ERROR', 'APP', 'RENDER', e.message, e.stack); }
+  }
+}
+
+/* =====================================================================
+   UI — рендер, радар, графики, табове, действия
+   ===================================================================== */
+const TABS = [['live', 'LIVE SIGNALS'], ['limits', 'ENTRY LIMITS'], ['tpsl', 'TP / SL'], ['missed', 'MISSED / CHASED'], ['results', 'PAPER RESULTS'], ['esdb', 'EARLY SIGNAL DB'], ['research', 'RESEARCH'], ['errors', 'ERRORS'], ['config', 'CONFIG']];
+const DEC_COLOR = { 'ALLOW PAPER': '#35f08d', WATCH: '#43d9ff', 'TOO LATE': '#ffb13d', REJECT: '#ff4a67' };
+const STAGE_COLOR = ['#465366', '#43d9ff', '#35f08d', '#f2df55', '#ffb13d', '#ff4a67'];
+const CH = { solana: 'SOL', base: 'BASE', bsc: 'BSC', ethereum: 'ETH' };
+const EXPLORER = { solana: a => `https://solscan.io/token/${a}`, base: a => `https://basescan.org/token/${a}`, bsc: a => `https://bscscan.com/token/${a}`, ethereum: a => `https://etherscan.io/token/${a}` };
+const sc = v => v == null ? 'mut' : v >= 70 ? 'up' : v >= 50 ? 'cy' : v >= 35 ? 'amb' : 'dn';
+const scInv = v => v == null ? 'mut' : v < 30 ? 'up' : v < 50 ? 'cy' : v < 70 ? 'amb' : 'dn';
+const r0 = v => v == null || !isFinite(v) ? '—' : String(Math.round(v));
+const pc = (v, d) => `<td class="${cls(v)}">${F.pct(v, d ?? (v != null && Math.abs(v) >= 100 ? 0 : 1))}</td>`;
+const heatBg = (v, inv) => { if (v == null || !isFinite(v)) return 'transparent'; const g = clamp(inv ? 100 - v : v, 0, 100); return `hsla(${Math.round(-8 + g * 1.5)},85%,${38 + g * 0.06}%,${0.16 + Math.abs(g - 50) / 50 * 0.34})`; };
+const tokSym = t => esc(t.symbol || F.short(t.address));
+const DEC_ORDER = { 'ALLOW PAPER': 4, WATCH: 3, 'TOO LATE': 2, REJECT: 1 };
+const ENTRY_LBL = { 'IN ZONE': ['LIMIT ✓', 'up'], 'ABOVE ZONE': ['WAIT', 'cy'], CHASED: ['NO CHASE', 'amb'], 'NO PLAN': ['—', 'dim'], EXPIRED: ['EXPIRED', 'mut'], 'INVALID-SL': ['INVALID', 'dn'], 'INVALID-LIQ': ['INVALID', 'dn'] };
+const SORTS = {
+  sym: t => (t.symbol || '').toLowerCase(), price: t => t.m.price, m5: t => t.m.chg.m5, h1: t => t.m.chg.h1, vol: t => t.m.vol.h1, liq: t => t.m.liq,
+  bsr: t => t.f.bsr5, ess: t => t.s.ess, stage: t => t.stage, radar: t => t.s.radar, copy: t => t.s.copy, risk: t => t.s.risk, age: t => t.f.ageMin ?? 1e9,
+  entry: t => ({ 'IN ZONE': 5, 'ABOVE ZONE': 4, CHASED: 3 }[t.entryState] || 0), dec: t => DEC_ORDER[t.decision] || 0
+};
+
+let _toastT = null;
+function toast(msg, ms = 2600) { const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(_toastT); _toastT = setTimeout(() => el.classList.remove('on'), ms); }
+function fitCanvas(cv, h) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(120, cv.clientWidth || cv.parentElement.clientWidth || 300);
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  cv.style.height = h + 'px'; const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h); return [ctx, w, h];
+}
+const liveTokens = () => [...S.tokens.values()].filter(t => t.m && t.s && t.f);
+const dexUrl = t => t.url || `https://dexscreener.com/${t.chain}/${t.address}`;
+const isSimTok = t => CFG.mode === 'sim' || /^SIM/.test(t.pairAddress || '');
+
+/* =====================================================================
+   RADAR SCOPE — рингове = етапи, ъгъл = hash на адреса, цвят = решение
+   ===================================================================== */
+const Radar = {
+  pts: [], ang: 0, lastT: 0, raf: null, size: 300,
+  init() {
+    this.cv = $('#radar'); this.ctx = this.cv.getContext('2d');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.cv.width = this.size * dpr; this.cv.height = this.size * dpr; this.cv.style.width = this.cv.style.height = this.size + 'px'; this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.c = this.size / 2; this.rMin = 16; this.w = (this.size / 2 - 8 - this.rMin) / 6;
+    const near = e => { const r = this.cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 169; for (const p of this.pts) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p; } } return best; };
+    this.cv.addEventListener('click', e => { const p = near(e); if (p) UI.select(p.key); });
+    this.cv.addEventListener('mousemove', e => { const p = near(e); this.cv.title = p ? `${p.sym} · ${STAGES[p.stage]} · radar ${Math.round(p.radar)} · ${p.dec}` : ''; this.cv.style.cursor = p ? 'pointer' : 'default'; });
+    this.loop = this.loop.bind(this);
+    document.addEventListener('visibilitychange', () => this.kick());
+    this.kick();
+  },
+  setData(list) {
+    const c = this.c, w = this.w;
+    this.pts = list.map(t => {
+      const a = hashAngle(t.key), j = (parseInt(fnv1a(t.key + '#').slice(0, 4), 16) / 0xffff - 0.5) * 0.72;
+      const r = this.rMin + (t.stage + 0.5 + j) * w;
+      return { key: t.key, sym: t.symbol || '?', a, x: c + r * Math.cos(a), y: c + r * Math.sin(a), stage: t.stage, radar: t.s.radar, dec: t.decision, col: DEC_COLOR[t.decision] || '#43d9ff', inv: t.investigate, sel: t.key === S.sel, open: S.paper.open.some(p => p.key === t.key) };
+    });
+    const top = [...this.pts].sort((a, b) => b.radar - a.radar).slice(0, 6); this.labels = new Set(top.map(p => p.key));
+    if (this.reduce || S.paused) this.draw();
+  },
+  kick() { if (this.reduce) { this.draw(); return; } if (!this.raf && !document.hidden && S.tab === 'live') this.raf = requestAnimationFrame(this.loop); },
+  loop(ts) {
+    this.raf = null; if (document.hidden || S.tab !== 'live') return;
+    if (ts - this.lastT >= 33) { const dt = this.lastT ? Math.min(100, ts - this.lastT) : 33; if (!S.paused) this.ang = (this.ang + dt / 1000 * 0.95) % (Math.PI * 2); this.lastT = ts; this.draw(); }
+    this.raf = requestAnimationFrame(this.loop);
+  },
+  draw() {
+    const x = this.ctx, c = this.c, S0 = this.size, w = this.w, rm = this.rMin, R = rm + 6 * w, TAU = Math.PI * 2;
+    x.clearRect(0, 0, S0, S0);
+    const g = x.createRadialGradient(c, c, 4, c, c, R); g.addColorStop(0, '#0b1a2b'); g.addColorStop(1, '#05080d');
+    x.fillStyle = g; x.beginPath(); x.arc(c, c, R, 0, TAU); x.fill();
+    const band = (i0, i1, col) => { x.fillStyle = col; x.beginPath(); x.arc(c, c, rm + i1 * w, 0, TAU); x.arc(c, c, rm + i0 * w, 0, TAU, true); x.fill(); };
+    band(1, 3, 'rgba(53,240,141,0.055)'); band(4, 6, 'rgba(255,74,103,0.05)');
+    x.lineWidth = 1;
+    for (let i = 0; i <= 6; i++) { x.strokeStyle = i === 6 ? '#263447' : '#16202e'; x.beginPath(); x.arc(c, c, rm + i * w, 0, TAU); x.stroke(); }
+    x.strokeStyle = '#131c28'; x.beginPath(); for (let k = 0; k < 12; k++) { const a = k * TAU / 12; x.moveTo(c + rm * Math.cos(a), c + rm * Math.sin(a)); x.lineTo(c + R * Math.cos(a), c + R * Math.sin(a)); } x.stroke();
+    x.font = '8px "IBM Plex Mono", monospace'; x.textAlign = 'left'; x.textBaseline = 'middle';
+    for (let i = 0; i < 6; i++) { x.fillStyle = i === 1 || i === 2 ? '#2f8a5c' : i >= 4 ? '#7a3444' : '#3a4758'; x.fillText(STAGE_SHORT[i], c + 3, c - (rm + (i + 0.5) * w)); }
+    if (!this.reduce) {
+      for (let k = 0; k < 18; k++) { x.fillStyle = `rgba(67,217,255,${(0.15 * (1 - k / 18)).toFixed(3)})`; x.beginPath(); x.moveTo(c, c); x.arc(c, c, R, this.ang - (k + 1) * 0.055, this.ang - k * 0.055); x.closePath(); x.fill(); }
+      x.strokeStyle = 'rgba(67,217,255,0.7)'; x.beginPath(); x.moveTo(c, c); x.lineTo(c + R * Math.cos(this.ang), c + R * Math.sin(this.ang)); x.stroke();
+    }
+    let selP = null;
+    for (const p of this.pts) {
+      const d = ((this.ang - p.a) % TAU + TAU) % TAU, glow = this.reduce ? 0.85 : 0.32 + 0.68 * Math.exp(-d * 1.3);
+      const rad = 1.6 + p.radar / 30;
+      x.globalAlpha = (p.stage === 0 && p.dec === 'WATCH' ? 0.55 : 1) * glow;
+      x.fillStyle = p.col; x.beginPath(); x.arc(p.x, p.y, rad, 0, TAU); x.fill();
+      if (glow > 0.8 && !this.reduce) { x.globalAlpha = (glow - 0.8) * 1.6; x.beginPath(); x.arc(p.x, p.y, rad + 3.5, 0, TAU); x.fill(); }
+      x.globalAlpha = 1;
+      if (p.inv) { x.strokeStyle = '#ae8cff'; x.lineWidth = 1.2; x.beginPath(); x.arc(p.x, p.y, rad + 3, 0, TAU); x.stroke(); x.lineWidth = 1; }
+      if (p.open) { x.strokeStyle = '#35f08d'; x.beginPath(); x.rect(p.x - rad - 2.5, p.y - rad - 2.5, (rad + 2.5) * 2, (rad + 2.5) * 2); x.stroke(); }
+      if (p.sel) selP = p;
+      if (this.labels && this.labels.has(p.key)) { x.fillStyle = 'rgba(205,216,232,0.8)'; x.font = '9px "IBM Plex Mono", monospace'; x.fillText(p.sym.slice(0, 10), p.x + rad + 3, p.y - 1); }
+    }
+    if (selP) { x.strokeStyle = '#43d9ff'; x.beginPath(); x.moveTo(selP.x - 11, selP.y); x.lineTo(selP.x - 5, selP.y); x.moveTo(selP.x + 5, selP.y); x.lineTo(selP.x + 11, selP.y); x.moveTo(selP.x, selP.y - 11); x.lineTo(selP.x, selP.y - 5); x.moveTo(selP.x, selP.y + 5); x.lineTo(selP.x, selP.y + 11); x.stroke(); x.fillStyle = '#43d9ff'; x.font = '600 10px "IBM Plex Mono", monospace'; x.fillText(selP.sym.slice(0, 12), selP.x + 12, selP.y + 10); }
+    x.fillStyle = '#43d9ff'; x.beginPath(); x.arc(c, c, 2.5, 0, TAU); x.fill();
+  }
+};
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+const UI = {
+  init() {
+    $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${k === S.tab}">${l}<span class="cnt" id="cnt-${k}"></span></button>`).join('');
+    $('#modeBadge').className = 'mode ' + CFG.mode;
+    $('#modeBadge').textContent = CFG.mode === 'sim' ? 'SIM · SYNTHETIC' : 'LIVE';
+    $('#modeBadge').title = CFG.mode === 'sim' ? 'Синтетичен пазар за тест на логиката. Нищо не се записва. Смени от CONFIG или махни ?mode=sim' : 'Реални данни от API. Всичко се пази локално в браузъра.';
+    this.bind();
+    Radar.init();
+    setInterval(() => this.tick1s(), 1000);
+    let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => this.render(), 180); });
+    const h = location.hash.replace('#', ''); if (TABS.some(([k]) => k === h)) this.tab(h, true);
+    window.addEventListener('hashchange', () => { const k = location.hash.replace('#', ''); if (k !== S.tab && TABS.some(([n]) => n === k)) this.tab(k); });
+    this.tick1s();
+  },
+  tab(name, silent) {
+    S.tab = name;
+    $$('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + name));
+    $$('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+    try { history.replaceState(null, '', location.pathname + location.search + '#' + name); } catch (e) { }
+    if (name === 'config') this.renderConfig();
+    if (!silent) this.render();
+    Radar.kick();
+  },
+  select(key, auto) {
+    S.sel = key; const t = S.tokens.get(key);
+    if (t && !auto && !t.t.userObserved) t.t.userObserved = Clock.now();
+    if (S.tab === 'live') this.renderLive(); else { this.tab('live'); }
+  },
+  render() {
+    const parts = [['header', () => this.renderHeader()], ['kpis', () => this.renderKpis()], ['tabs', () => this.renderTabs()]];
+    const view = { live: () => this.renderLive(), limits: () => this.renderLimits(), tpsl: () => this.renderTpsl(), missed: () => this.renderMissed(), results: () => this.renderResults(), esdb: () => this.renderEsdb(), research: () => this.renderResearch(), errors: () => this.renderErrors() }[S.tab];
+    if (view) parts.push([S.tab, view]);
+    for (const [n, fn] of parts) { try { fn(); } catch (e) { Log.add('ERROR', 'UI', 'RENDER', `${n}: ${e.message}`, e.stack); } }
+  },
+
+  /* ---------- header ---------- */
+  tick1s() {
+    const now = Date.now();
+    $('#clock').textContent = CFG.mode === 'sim' ? `SIM ${F.time(Sim.now)} · ×${Math.round(30000 / CFG.sim.tickMs)}` : F.time(now);
+    const el = $('#scanInfo');
+    if (S.paused) el.innerHTML = '<span class="amb">PAUSED</span>';
+    else if (S.scanning) el.innerHTML = '<span class="cy">SCANNING…</span>';
+    else el.textContent = `cycle #${S.cycles} · ${Math.round(S.lastScanMs)}ms · next ${S.nextAt ? Math.max(0, Math.ceil((S.nextAt - now) / 1000)) + 's' : '—'}`;
+  },
+  renderHeader() { this.renderLights(); this.tick1s(); $('#pauseBtn').textContent = S.paused ? 'RESUME' : 'PAUSE'; $('#pauseBtn').classList.toggle('go', S.paused); },
+  renderLights() {
+    const srcs = CFG.mode === 'sim' ? [['SIM', 'SIM']] : [['DEX', 'DEX'], ['GT', 'GT'], ['CG', 'CG'], ['BE', 'BIRDEYE'], ['FOMO', 'FOMO']];
+    const off = { BE: !CFG.src.birdeye || !SECRETS.birdeye, FOMO: !CFG.src.fomo || !SECRETS.fomo };
+    $('#lights').innerHTML = srcs.map(([k, l]) => {
+      if (k === 'SIM') return `<span title="Синтетични данни"><i class="light warn"></i>SIM FEED</span>`;
+      const st = S.api[k], h = off[k] ? 'off' : API.health(k), lat = API.avgLat(k);
+      const tip = off[k] ? `${l}: изключен или няма API ключ (CONFIG)` : st ? `${l}: ${st.calls} calls · ${st.ok} ok · ${st.err} err · ${lat ? Math.round(lat) + 'ms' : '—'}${st.lastErr ? ' · last: ' + st.lastErr : ''}${Date.now() < st.backoffUntil ? ' · backoff ' + Math.ceil((st.backoffUntil - Date.now()) / 1000) + 's' : ''}` : `${l}: още няма заявки`;
+      return `<span title="${esc(tip)}"><i class="light ${h}"></i>${l}</span>`;
+    }).join('');
+  },
+  renderKpis() {
+    const L = liveTokens(), cnt = d => L.filter(t => t.decision === d).length;
+    const auto = S.paper.closed.filter(p => p.how === 'auto'), st = paperStats(auto);
+    const errH = S.errors.filter(e => e.level === 'ERROR' && Date.now() - e.ts < 3600000).reduce((a, e) => a + (e.count || 1), 0);
+    const es = S.esdb.filter(r => r.done && !r.expired).length;
+    const k = [
+      [`${L.length}<small class="mini">/${S.tokens.size}</small>`, 'UNIVERSE (data/all)', ''],
+      [L.filter(t => t.stage === 1 || t.stage === 2).length, 'EARLY + DEVELOPING', 'cy'],
+      [cnt('ALLOW PAPER'), 'ALLOW PAPER', 'up'], [cnt('WATCH'), 'WATCH', 'cy'], [cnt('TOO LATE'), 'TOO LATE', 'amb'], [cnt('REJECT'), 'REJECT', 'dn'],
+      [L.filter(t => t.investigate).length, 'INVESTIGATE', 'vi'],
+      [`${S.paper.open.length}/${CFG.paper.maxOpen}`, 'OPEN PAPER', ''],
+      [`${auto.length}/${CFG.paper.target}`, 'FOMO PAPER (auto)', 'vi'],
+      [st.n ? F.n(st.win, 0) + '%' : '—', 'WIN RATE', st.n ? (st.win >= 50 ? 'up' : 'amb') : 'mut'],
+      [st.n ? F.r(st.avgR) : '—', 'EXPECTANCY / TRADE', st.n ? cls(st.avgR) : 'mut'],
+      [st.n ? (st.pnl >= 0 ? '+' : '') + '$' + st.pnl.toFixed(2) : '—', 'NET PnL ($5 size)', st.n ? cls(st.pnl) : 'mut'],
+      [`${es}/${S.esdb.length}`, 'ESDB DONE/ALL', ''],
+      [errH, 'ERRORS / 1H', errH ? 'dn' : 'up']
+    ];
+    $('#kpis').innerHTML = k.map(([v, l, c]) => `<div class="kpi"><b class="${c}">${v}</b><span>${l}</span></div>`).join('');
+  },
+  renderTabs() {
+    const set = (k, v) => { const e = $('#cnt-' + k); if (e) e.textContent = v ? v : ''; };
+    set('limits', liveTokens().filter(t => t.plan).length); set('tpsl', S.paper.open.length); set('missed', S.missed.filter(r => !r.done).length);
+    set('research', S.research.length); set('results', S.paper.closed.length);
+    set('errors', S.errors.filter(e => e.level === 'ERROR' && Date.now() - e.ts < 3600000).length);
+  },
+
+  /* ---------- LIVE SIGNALS ---------- */
+  filtered() {
+    const q = S.filter.q.trim().toLowerCase(), d = S.filter.dec;
+    let L = liveTokens();
+    if (d === 'INVESTIGATE') L = L.filter(t => t.investigate); else if (d !== 'ALL') L = L.filter(t => t.decision === d);
+    if (q) L = L.filter(t => (t.symbol + ' ' + t.name + ' ' + t.address).toLowerCase().includes(q));
+    const fn = SORTS[S.sort.col] || SORTS.radar, dir = S.sort.dir;
+    return L.sort((a, b) => { const x = fn(a), y = fn(b); return (x > y ? 1 : x < y ? -1 : 0) * dir || (b.s.radar - a.s.radar); });
+  },
+  renderLive() {
+    const all = liveTokens();
+    if (!S.sel && all.length) { const top = [...all].sort((a, b) => b.s.radar - a.s.radar)[0]; S.sel = top.key; }
+    const parts = [
+      ['chips', () => this.renderChips(all)], ['table', () => this.renderTable()], ['radar', () => { Radar.setData(all); $('#radarInfo').textContent = `${all.length} blips · sweep ${Radar.reduce ? 'off' : 'on'}`; }],
+      ['funnel', () => this.renderFunnel(all)], ['hist', () => this.renderHist(all)], ['heat', () => this.renderHeat(all)],
+      ['scatter', () => this.drawScatter(all)], ['tape', () => this.renderTape()], ['snap', () => this.renderSnap()]
+    ];
+    for (const [n, fn] of parts) { try { fn(); } catch (e) { Log.add('ERROR', 'UI', 'RENDER', `live/${n}: ${e.message}`, e.stack); } }
+  },
+  renderChips(all) {
+    const n = d => d === 'ALL' ? all.length : d === 'INVESTIGATE' ? all.filter(t => t.investigate).length : all.filter(t => t.decision === d).length;
+    $('#decChips').innerHTML = ['ALL', 'ALLOW PAPER', 'WATCH', 'TOO LATE', 'REJECT', 'INVESTIGATE'].map(d => `<button class="chip ${S.filter.dec === d ? 'on' : ''}" data-act="dec" data-v="${d}">${d} ${n(d)}</button>`).join(' ');
+  },
+  renderTable() {
+    const L = this.filtered(), col = S.sort.col, arrow = S.sort.dir > 0 ? '▲' : '▼';
+    const H = [['sym', 'TOKEN', 'l', 'Символ · верига · възраст на пула'], ['price', 'PRICE', '', ''], ['m5', '5M', '', 'Промяна 5 мин'], ['h1', '1H', '', 'Промяна 1 час'], ['vol', 'VOL 1H', '', 'Обем 1 час'], ['liq', 'LIQ', '', 'Ликвидност на пула'], ['bsr', 'B/S 5M', '', 'Buy/Sell ratio (брой сделки) 5 мин'], ['ess', 'ESS', '', 'Early Signal Score 0–100'], ['stage', 'STAGE', 'l', 'Етап на pump-а 0–5'], ['radar', 'RADAR', '', 'Radar Score = 30% ESS + 20% Pump Quality + 20% Copyability + 15% (100−Risk) + 15% Stage fit'], ['copy', 'COPY', '', 'Copyability — може ли реално да се изпълни'], ['risk', 'RISK', '', 'Token Risk (по-ниско = по-добре)'], ['entry', 'ENTRY', 'l', 'Състояние спрямо заключения план'], ['dec', 'DECISION', 'l', '']];
+    const head = '<thead><tr>' + H.map(([k, l, c, tip]) => `<th data-sort="${k}" class="${c} ${col === k ? 'on' : ''}" title="${esc(tip)}">${l}${col === k ? ' ' + arrow : ''}</th>`).join('') + '</tr></thead>';
+    const rows = L.slice(0, 160).map(t => {
+      const m = t.m, f = t.f, s = t.s, [el, ec] = ENTRY_LBL[t.entryState] || ['—', 'dim'];
+      return `<tr data-key="${esc(t.key)}"${t.key === S.sel ? ' class="sel"' : ''}><td class="l tok"><b>${tokSym(t)}</b><small>${CH[t.chain] || esc(t.chain)} · ${F.age(f.ageMin)}</small></td><td>${F.px(m.price)}</td>${pc(m.chg.m5)}${pc(m.chg.h1)}<td>${F.usd(m.vol.h1)}</td><td class="${m.liq < CFG.gates.minLiq ? 'dn' : ''}">${F.usd(m.liq)}</td><td class="${f.bsr5 >= 1.3 ? 'up' : f.bsr5 < 0.8 ? 'dn' : ''}">${F.x(f.bsr5, 1)}</td><td class="es ${sc(s.ess)}">${r0(s.ess)}</td><td class="l"><span class="stg s${t.stage}">${STAGE_SHORT[t.stage]}</span></td><td><b class="pill ${sc(s.radar)}">${r0(s.radar)}</b></td><td class="${sc(s.copy)}">${r0(s.copy)}</td><td class="${scInv(s.risk)}">${r0(s.risk)}</td><td class="l ${ec}">${el}</td><td class="l"><span class="dec ${decClass(t.decision)}">${esc(t.decision || '—')}</span>${t.investigate ? ' <span class="dec INV" title="Radar ≥ investigate праг → за FOMO Test Agent">INV</span>' : ''}</td></tr>`;
+    }).join('');
+    const empty = !L.length ? `<tbody><tr><td colspan="14" class="l" style="white-space:normal;padding:18px 10px;color:var(--mut)">${liveTokens().length ? 'Няма токени за този филтър.' : CFG.mode === 'live' ? 'Чакам данни от API… първият цикъл отнема 5–20 сек. Ако светлините горе са червени — виж таба ERRORS (мрежа/CORS). За тест на логиката отвори с <b>?mode=sim</b>.' : 'SIM загрява…'}</td></tr></tbody>` : '';
+    $('#sig').innerHTML = head + (empty || '<tbody>' + rows + '</tbody>');
+    $('#sigInfo').textContent = `${L.length} shown · sort ${col}`;
+  },
+  renderFunnel(all) {
+    const n = [0, 0, 0, 0, 0, 0], a = [0, 0, 0, 0, 0, 0]; for (const t of all) { n[t.stage]++; if (t.decision === 'ALLOW PAPER') a[t.stage]++; }
+    const mx = Math.max(1, ...n);
+    const rows = STAGES.map((s, i) => `<span class="s${i}">${i} ${s}</span><div class="b" title="${n[i]} токена · ${a[i]} ALLOW PAPER"><i style="width:${n[i] / mx * 100}%;background:${STAGE_COLOR[i]};opacity:.35"></i><em style="width:${a[i] / mx * 100}%"></em></div><span style="text-align:right">${n[i]}</span>`).join('');
+    const planned = all.filter(t => t.plan).length, allow = all.filter(t => t.decision === 'ALLOW PAPER').length;
+    $('#funnel').innerHTML = rows + `<span class="mini" style="grid-column:1/-1;margin-top:6px">PIPELINE: seen ${S.tokens.size} → data ${all.length} → plan ${planned} → allow ${allow} → open ${S.paper.open.length}. Радарът предпочита етапи 1–2; 4–5 = NO CHASE.</span>`;
+  },
+  renderHist(all) {
+    const b = new Array(20).fill(0); for (const t of all) b[Math.min(19, Math.floor(t.s.radar / 5))]++;
+    const mx = Math.max(1, ...b), q = CFG.gates.qualify, p = CFG.gates.paper;
+    $('#hist').innerHTML = b.map((n, i) => `<div class="${i * 5 >= p ? 'p' : i * 5 >= q ? 'q' : ''}" style="height:${n / mx * 100}%" title="${i * 5}–${i * 5 + 5}: ${n}"></div>`).join('');
+    const avg = all.length ? all.reduce((x, t) => x + t.s.radar, 0) / all.length : null;
+    $('#histInfo').textContent = `avg ${F.n(avg, 0)} · ≥Q ${all.filter(t => t.s.radar >= q).length}`;
+  },
+  renderHeat(all) {
+    const top = [...all].sort((a, b) => b.s.radar - a.s.radar).slice(0, 20);
+    const C = [['ESS', t => t.s.ess], ['MOM', t => t.s.momentum], ['VOL', t => t.s.volume], ['FLOW', t => t.s.flow], ['ACT', t => t.s.activity], ['ACCEL', t => t.s.accel], ['LIQ', t => t.s.liq], ['BRDTH', t => t.s.breadth], ['SRC', t => t.s.src], ['PQ', t => t.s.pq], ['COPY', t => t.s.copy], ['RISK', t => t.s.risk, 1], ['SLIP', t => t.s.slipRisk, 1], ['RADAR', t => t.s.radar]];
+    $('#heat').innerHTML = `<thead><tr><th class="l">TOKEN</th>${C.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>` + top.map(t => `<tr data-key="${esc(t.key)}"${t.key === S.sel ? ' class="sel"' : ''}><td class="l tok"><b>${tokSym(t)}</b> <span class="stg s${t.stage}" style="min-width:0">${t.stage}</span></td>${C.map(([, fn, inv]) => { const v = fn(t); return `<td style="background:${heatBg(v, inv)}">${r0(v)}</td>`; }).join('')}</tr>`).join('') + '</tbody>';
+  },
+  drawScatter(all) {
+    const cv = $('#scatter'); const [x, W, H] = fitCanvas(cv, 230);
+    const L = 38, Rm = 8, T = 8, B = 22, pw = W - L - Rm, ph = H - T - B;
+    const lx = v => L + (clamp(Math.log10(Math.max(v, 1)), 3.5, 7) - 3.5) / 3.5 * pw;
+    const sl = v => Math.sign(v) * Math.log10(1 + Math.abs(v) / 10);
+    const y0 = sl(-100), y1 = sl(1000), ly = v => T + ph - (clamp(sl(v || 0), y0, y1) - y0) / (y1 - y0) * ph;
+    x.font = '9px "IBM Plex Mono", monospace'; x.fillStyle = '#465366'; x.strokeStyle = '#141d2a'; x.lineWidth = 1;
+    for (const v of [1e4, 1e5, 1e6, 1e7]) { const X = lx(v); x.beginPath(); x.moveTo(X, T); x.lineTo(X, T + ph); x.stroke(); x.textAlign = 'center'; x.fillText(F.usd(v), X, H - 7); }
+    for (const v of [-50, 0, 25, 100, 500]) { const Y = ly(v); x.strokeStyle = v === 0 ? '#263447' : '#141d2a'; x.beginPath(); x.moveTo(L, Y); x.lineTo(L + pw, Y); x.stroke(); x.textAlign = 'right'; x.fillText((v > 0 ? '+' : '') + v + '%', L - 4, Y + 3); }
+    const gx = lx(CFG.gates.minLiq); x.strokeStyle = 'rgba(255,177,61,.55)'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(gx, T); x.lineTo(gx, T + ph); x.stroke(); x.setLineDash([]);
+    x.fillStyle = '#ffb13d'; x.textAlign = 'left'; x.fillText('min liq', gx + 3, T + 9);
+    this._sc = [];
+    for (const t of [...all].sort((a, b) => a.s.radar - b.s.radar)) {
+      const X = lx(t.m.liq), Y = ly(t.m.chg.h1), r = clamp(2 + Math.sqrt(t.m.vol.h1) / 70, 2, 10);
+      x.globalAlpha = 0.72; x.fillStyle = DEC_COLOR[t.decision] || '#43d9ff'; x.beginPath(); x.arc(X, Y, r, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1;
+      if (t.key === S.sel) { x.strokeStyle = '#fff'; x.beginPath(); x.arc(X, Y, r + 3, 0, Math.PI * 2); x.stroke(); }
+      this._sc.push({ key: t.key, X, Y, r, sym: t.symbol });
+    }
+    if (!cv._bound) {
+      cv._bound = 1;
+      const hit = e => { const rc = cv.getBoundingClientRect(), mx = e.clientX - rc.left, my = e.clientY - rc.top; let b = null, bd = 144; for (const p of this._sc || []) { const d = (p.X - mx) ** 2 + (p.Y - my) ** 2; if (d < bd) { bd = d; b = p; } } return b; };
+      cv.addEventListener('click', e => { const p = hit(e); if (p) this.select(p.key); });
+      cv.addEventListener('mousemove', e => { const p = hit(e); cv.title = p ? p.sym : ''; cv.style.cursor = p ? 'pointer' : 'default'; });
+    }
+  },
+  renderTape() {
+    $('#tape').innerHTML = S.events.slice(0, 90).map(e => `<div data-key="${esc(e.key || '')}"><time>${F.time(e.ts)}</time><b class="${e.c}">${esc(e.kind)}</b><span>${esc(e.text)}</span></div>`).join('') || '<p class="empty">Още няма събития.</p>';
+    $('#tapeInfo').textContent = S.events.length + ' events';
+  },
+
+  /* ---------- SNAPSHOT ---------- */
+  renderSnap() {
+    const box = $('#snap'), info = $('#snapInfo'), t = S.sel && S.tokens.get(S.sel);
+    if (!t) { box.innerHTML = '<div class="empty">Избери токен от таблицата, радара или event tape.</div>'; info.textContent = ''; return; }
+    if (!t.m || !t.s || !t.f) { box.innerHTML = `<div class="empty">${tokSym(t)} — чакам пазарни данни…</div>`; info.textContent = t.chain; return; }
+    const now = Clock.now(), m = t.m, f = t.f, s = t.s, G = CFG.gates, PP = CFG.paper;
+    let P = t.plan, preview = false; if (!P && t.stage <= 3) { try { P = makePlan(t, now); preview = true; } catch (e) { P = null; } }
+    const pos = S.paper.open.find(p => p.key === t.key);
+    const fs = fomoStats(t, now), e = t.edge || edgeOf(t), sim = isSimTok(t);
+    info.textContent = `${CH[t.chain] || t.chain} · ${t.dexId || ''} · upd ${F.time(m.updated)}`;
+    const H = [];
+    // header
+    H.push(`<div class="snap-head"><div class="snap-top"><div><h2>${tokSym(t)}</h2><div class="sub">${esc(t.name || '')} · ${esc(t.chain)} · pair age ${F.age(f.ageMin)}<br>${esc(t.address)}</div></div><div style="text-align:right"><div class="big">${F.px(m.price)}</div><div class="mini">MC ${F.usd(m.mc)} · LIQ ${F.usd(m.liq)}</div></div></div>
+      <div class="chg"><span><i>5m</i><b class="${cls(m.chg.m5)}">${F.pct(m.chg.m5)}</b></span><span><i>15m</i><b class="${cls(m.chg.m15)}">${F.pct(m.chg.m15)}</b></span><span><i>1h</i><b class="${cls(m.chg.h1)}">${F.pct(m.chg.h1)}</b></span><span><i>6h</i><b class="${cls(m.chg.h6)}">${F.pct(m.chg.h6, 0)}</b></span><span><i>24h</i><b class="${cls(m.chg.h24)}">${F.pct(m.chg.h24, 0)}</b></span></div>
+      <div class="decision-row"><span class="dec ${decClass(t.decision)}">${esc(t.decision)}</span>${t.investigate ? '<span class="dec INV">INVESTIGATE</span>' : ''}<span class="stg s${t.stage}" style="min-width:0">STAGE ${t.stage} · ${STAGES[t.stage]}</span><span class="pill ${sc(s.radar)}" title="Radar Score">RADAR ${r0(s.radar)}</span></div>
+      ${t.reasons && t.reasons.length ? `<div class="reasons">${t.reasons.map(esc).join(' · ')}</div>` : ''}`);
+    if (t.entryState === 'CHASED' && t.plan) H.push(`<div class="callout"><b>SIGNAL VALID · ENTRY INVALID</b><br>Цената мръдна ${F.pct((m.price / t.plan.p0 - 1) * 100)} от заключването на плана (${F.px(t.plan.p0)}) и е над chase лимита ${F.px(t.plan.chase)}.<br>→ DO NOT CHASE → WAIT FOR RETEST ≤ ${F.px(t.plan.entryHigh)}</div>`);
+    else if (t.decision === 'REJECT' && s.pumpSignal >= 65) H.push(`<div class="callout bad"><b>PUMP DETECTED · EXECUTION REJECT</b><br>Pump сигнал ${r0(s.pumpSignal)}/100, но изпълнението не минава: ${esc((t.reasons || []).join(', '))}. Radar Score ≠ Coin Quality.</div>`);
+    else if (t.decision === 'TOO LATE') H.push(`<div class="callout"><b>TOO LATE · NO CHASE</b><br>${esc((t.reasons || []).join(', '))}</div>`);
+    else if (t.decision === 'ALLOW PAPER') H.push(`<div class="callout ok"><b>ALLOW PAPER</b> · ${t.entryState === 'IN ZONE' ? 'цената е в entry зоната — auto paper влиза при следващия цикъл (ако AUTO е включен)' : 'чакай цена в entry зоната ' + F.px(P.entryLow) + ' – ' + F.px(P.entryHigh)}</div>`);
+    H.push('</div>');
+    // plan
+    if (P) {
+      const pctNow = v => F.pct((v / m.price - 1) * 100);
+      const ttl = P.ttlMin * 60000 - (now - P.createdAt);
+      H.push(`<div class="sect"><h3>EXECUTABLE PLAN ${preview ? '<span class="pvw" title="Токенът още не е квалифициран — това е изчисление, не е заключено">PREVIEW · NOT LOCKED</span>' : `<span class="lock">LOCK <b>${P.lock}</b> · ${esc(t.entryState)} · TTL ${F.dur(ttl)}</span>`}</h3>
+        <div class="plan">
+          <span>ENTRY LIMIT</span><span class="up">${F.px(P.entryLow)} – ${F.px(P.entryHigh)}</span><span>${pctNow(P.entryHigh)}</span><span class="mut">vs now</span>
+          <span>DO NOT CHASE ABOVE</span><span class="amb">${F.px(P.chase)}</span><span>${pctNow(P.chase)}</span><span class="mut">vs now</span>
+          ${P.tp.map((v, i) => `<span>TP${i + 1}</span><span class="up">${F.px(v)}</span><span class="up">${F.pct((v / P.mid - 1) * 100)}</span><span>${P.tpR[i].toFixed(1)}R</span>`).join('')}
+          <span>SL</span><span class="dn">${F.px(P.sl)}</span><span class="dn">${F.pct(-P.slPct)}</span><span>−1R</span>
+        </div>
+        <div class="mini" style="margin-top:5px">Position: <b class="cy">$${PP.size} PAPER</b> · exp. slippage ${F.n(f.slipPaper, 2)}% ($${PP.size}) / ${F.n(f.slipRef, 2)}% ($${PP.refSize}) · vol unit ${F.n(P.vol, 1)}% · p0 ${F.px(P.p0)}${preview ? '' : ' · locked ' + F.time(P.createdAt)}</div>
+      </div>`);
+    }
+    if (!P) H.push(`<div class="sect"><h3>EXECUTABLE PLAN</h3><div class="callout bad" style="margin-top:0"><b>NO PLAN · NO CHASE</b><br>${esc(STAGES[t.stage])} — радарът не изгражда вход в етап 4–5. Следи за нов цикъл: връщане към EARLY/DEVELOPING с нова ликвидност и buy flow.</div></div>`);
+    H.push(`<div class="sect"><h3>PRICE${P ? ' · ZONE · CHASE · SL · TP' : ''}</h3><canvas id="snapChart"></canvas></div>`);
+    // scores
+    const execScore = (s.copy + (100 - s.risk) + (100 - s.slipRisk)) / 3;
+    const bar = (l, v, inv, tip) => `<span title="${esc(tip || '')}">${l}</span><div class="b"><i style="width:${clamp(v ?? 0, 0, 100)}%;background:${inv ? (v >= 70 ? '#ff4a67' : v >= 40 ? '#ffb13d' : '#35f08d') : (v >= 70 ? '#35f08d' : v >= 50 ? '#43d9ff' : v >= 35 ? '#ffb13d' : '#ff4a67')}"></i></div><span class="${inv ? scInv(v) : sc(v)}">${r0(v)}</span>`;
+    H.push(`<div class="sect"><h3>SCORES</h3><div class="bars">
+      ${bar('RADAR', s.radar, 0, 'Радар: 30% ESS + 20% PQ + 20% Copy + 15% (100−Risk) + 15% Stage fit')}${bar('EARLY SIGNAL', s.ess, 0, 'Early Signal Score')}${bar('PUMP QUALITY', s.pq)}${bar('COPYABILITY', s.copy)}${bar('TOKEN RISK', s.risk, 1)}${bar('SLIPPAGE RISK', s.slipRisk, 1, 'при референтен размер $' + PP.refSize)}
+      </div><div class="bars" style="margin-top:6px">
+      ${bar('momentum', s.momentum)}${bar('volume', s.volume)}${bar('flow (B/S)', s.flow)}${bar('tx activity', s.activity)}${bar('vol accel', s.accel)}${bar('liquidity', s.liq)}${bar('youth', s.youth)}${bar('sources', s.src)}${bar('breadth', s.breadth)}
+      </div>
+      <div class="kv2" style="margin-top:8px"><dl class="kv"><dt>PUMP SIGNAL</dt><dd class="${sc(s.pumpSignal)}">${r0(s.pumpSignal)}</dd></dl><dl class="kv"><dt>EXECUTION</dt><dd class="${sc(execScore)}">${r0(execScore)}</dd></dl></div>
+      ${s.riskWhy.length ? `<div class="reasons" style="margin-top:4px">risk: ${s.riskWhy.map(esc).join(' · ')}</div>` : ''}</div>`);
+    // market
+    const kv = rows => '<dl class="kv">' + rows.map(([k, v, c]) => `<dt>${k}</dt><dd class="${c || ''}">${v}</dd>`).join('') + '</dl>';
+    const holder = t.sec && t.sec.top10 != null ? (t.sec.top10 > 40 ? ['HIGH', 'dn'] : t.sec.top10 > 25 ? ['MODERATE', 'amb'] : ['LOW', 'up']) : ['N/A', 'mut'];
+    H.push(`<div class="sect"><h3>MARKET</h3><div class="kv2">${kv([['Price', F.px(m.price)], ['Market cap', F.usd(m.mc)], ['FDV', F.usd(m.fdv)], ['Liquidity', F.usd(m.liq), m.liq < G.minLiq ? 'dn' : ''], ['Liq peak', F.usd(t.liqPeak)], ['Liq vs peak', F.pct(f.liqDropPeak), cls(f.liqDropPeak)], ['Vol 5m', F.usd(m.vol.m5)], ['Vol 1h', F.usd(m.vol.h1)], ['Vol 6h', F.usd(m.vol.h6)], ['Vol 24h', F.usd(m.vol.h24)], ['Liq / MC', F.pct(f.liqMc != null ? f.liqMc * 100 : null)], ['Vol / Liq 1h', F.x(f.volLiqH1)], ['Turnover 24h', F.x(f.turnover, 1)]])}
+      ${kv([['Buys / Sells 5m', `${m.tx.m5.b} / ${m.tx.m5.s}`], ['Buys / Sells 1h', `${m.tx.h1.b} / ${m.tx.h1.s}`], ['Buys / Sells 24h', `${m.tx.h24.b} / ${m.tx.h24.s}`], ['B/S ratio 5m', F.x(f.bsr5), f.bsr5 >= 1.3 ? 'up' : f.bsr5 < 0.8 ? 'dn' : ''], ['B/S ratio 1h', F.x(f.bsrH1)], ['Tx 5m', f.tx5], ['Tx accel', F.x(f.txAccel), f.txAccel > 1.3 ? 'up' : ''], ['Vol accel', F.x(f.volAccel), f.volAccel > 1.3 ? 'up' : ''], ['Avg trade 5m', F.usd(f.avgTrade5)], ['Drawdown 60m', F.pct(f.dd), cls(f.dd)], ['Exp. slip $' + PP.size, F.n(f.slipPaper, 2) + '%'], ['Holder risk', holder[0], holder[1]], ['Socials / site', `${m.socials} / ${m.websites}`, m.socials + m.websites ? '' : 'amb']])}</div></div>`);
+    // activity
+    const last = fs.last ? `${esc(fs.last.trader)} ${fs.last.side} $${Math.round(fs.last.usd || 0)} · ${F.dur(now - fs.last.ts)} ago` : '—';
+    H.push(`<div class="sect"><h3>ACTIVITY BY SOURCE</h3><div class="kv2">${kv([['FOMO buys 5/15m', `${fs.b5} / ${fs.b15}`, fs.b5 ? 'up' : ''], ['FOMO traders 15m', fs.tr15, fs.tr15 ? 'up' : ''], ['FOMO net 15m', F.usd(fs.net15), cls(fs.net15)], ])}
+      ${kv([['GT buyers/sellers', t.gt && t.gt.b5 != null ? `${t.gt.b5} / ${t.gt.s5 ?? '—'}` : '—'], ['Birdeye top10', t.sec && t.sec.top10 != null ? F.n(t.sec.top10, 1) + '%' : 'нужен ключ', t.sec ? scInv(t.sec.top10) : 'mut'], ['Freeze / mutable', t.sec ? `${t.sec.freeze ? 'YES' : 'no'} / ${t.sec.mutable ? 'YES' : 'no'}` : '—', t.sec && t.sec.freeze ? 'dn' : ''], ['CG trending', t.sources.cg_trend ? 'symbol match*' : 'no', t.sources.cg_trend ? 'amb' : 'mut'], ['DEX boosts', m.boosts || t.boostAmt || 0]])}</div>
+      <div class="mini" style="margin-top:4px">FOMO last: ${last}</div><div class="srcs" style="margin-top:6px">${Object.entries(t.sources).map(([k, ts]) => `<span><b>${esc(SRC_LABEL[k] || k)}</b> ${F.time(ts)}</span>`).join('')}</div></div>`);
+    // timestamps + early edge
+    const T0 = t.t.firstDetected;
+    const tl = [['First detected', t.t.firstDetected], ['Radar qualified', t.t.radarQualified], ['Entry available', t.t.entryAvailable], ['User observed', t.t.userObserved], ['Paper fill', t.t.paperFill]];
+    H.push(`<div class="sect"><h3>TIMESTAMPS</h3><div class="tl">${tl.map(([l, ts]) => `<span>${l}</span><span>${ts ? F.time(ts) : '—'}</span><span>${ts && T0 ? '+' + F.dur(ts - T0) : ''}</span>`).join('')}</div></div>`);
+    H.push(`<div class="sect"><h3>EARLY INFORMATION ADVANTAGE</h3><div class="kv2">${kv([['Signal lead time', F.dur(e.lead)], ['Δ1h @ detection', F.pct(e.runDet), e.runDet >= CFG.edge.lostRunup ? 'dn' : e.runDet >= CFG.edge.goodRunup ? 'amb' : 'up']])}${kv([[e.filled ? 'Move → fill' : 'Move since det.', F.pct(e.move), e.move >= CFG.edge.lostMove ? 'dn' : e.move >= CFG.edge.goodMove ? 'amb' : 'up'], ['Early Edge', `<span class="edge ${e.edge}">${e.edge}</span>`]])}</div>
+      ${e.edge === 'LOST' ? '<div class="reasons" style="margin-top:4px">Edge LOST → REJECT / TOO LATE (освен ако вече има fill).</div>' : ''}</div>`);
+    // protections + invalidation
+    if (P) {
+      const R = P.mid - P.sl;
+      H.push(`<div class="sect"><h3>4 PROTECTIONS <span class="mini">(заключват се в snapshot-а при входа)</span></h3><ul class="ul">
+        <li><b>HARD SL</b> ${F.px(P.sl)} (−${F.n(P.slPct, 1)}%)</li>
+        <li><b>TIME STOP</b> ако за ${PP.timeStopMin} мин няма TP1 и печалбата е &lt; ${PP.timeStopR}R (${F.px(P.mid + PP.timeStopR * R)})</li>
+        <li><b>LIQUIDITY STOP</b> ликвидност −${PP.liqStopPct}% от входа → изход (${F.usd(m.liq * (1 - PP.liqStopPct / 100))})</li>
+        <li><b>TRAILING след TP1</b> затваря ${Math.round(PP.tpFrac[0] * 100)}% на TP1 и SL → break-even; на TP2 още ${Math.round(PP.tpFrac[1] * 100)}% и SL → TP1; остатъкът до TP3</li>
+        <li><b>MAX HOLD</b> ${PP.maxHoldMin} мин</li></ul>
+        <h3 style="margin-top:8px">INVALIDATION</h3><ul class="ul">
+        <li>Liquidity &lt; <b>${F.usd(P.liqInvalid)}</b> (−35% от ${F.usd(P.liqAt)}) → plan INVALID</li>
+        <li>Price &gt; chase <b>${F.px(P.chase)}</b> → ENTRY INVALID · DO NOT CHASE</li>
+        <li>Price ≤ SL преди вход → plan INVALID · ${P.ttlMin} мин без fill → EXPIRED</li>
+        <li>В позиция: −${PP.liqStopPct}% liquidity withdrawal → LIQ STOP</li></ul></div>`);
+    }
+    if (pos) H.push(`<div class="sect"><h3>OPEN PAPER POSITION</h3>${kv([['Entry', F.px(pos.entry)], ['Now', F.px(pos.last)], ['P&L', F.pct((pos.last / pos.entry - 1) * 100), cls(pos.last - pos.entry)], ['Stop (effective)', F.px(Paper.effSL(pos))], ['Left', Math.round(pos.left * 100) + '%'], ['Lock', Paper.verify(pos) ? '✓ ' + pos.lock : '✗ TAMPERED', Paper.verify(pos) ? 'up' : 'dn']])}</div>`);
+    // actions
+    const links = sim ? '<span class="mini">SIM токен — няма външни линкове</span>' : `<a href="${esc(dexUrl(t))}" target="_blank" rel="noopener">DEXSCREENER ↗</a><a href="https://birdeye.so/token/${esc(t.address)}?chain=${esc(t.chain)}" target="_blank" rel="noopener">BIRDEYE ↗</a>${EXPLORER[t.chain] ? `<a href="${esc(EXPLORER[t.chain](t.address))}" target="_blank" rel="noopener">EXPLORER ↗</a>` : ''}`;
+    const inRs = S.research.some(r => r.key === t.key);
+    H.push(`<div class="sect"><div class="btns"><button class="btn go" data-act="paper" ${pos ? 'disabled title="Вече има отворена позиция"' : ''}>PAPER $${PP.size}</button><button class="btn" data-act="rs-save">${inRs ? '★ IN RESEARCH' : 'SAVE RESEARCH'}</button><button class="btn vi" data-act="investigate" title="Записва в research и сваля handoff JSON (и го копира) за FOMO Test Agent">INVESTIGATE → FOMO AGENT</button><button class="btn" data-act="copy-ca">COPY CA</button></div><div class="links">${links}</div></div>`);
+    box.innerHTML = H.join('');
+    this.drawSnapChart(t, P, pos, preview);
+  },
+  drawSnapChart(t, P, pos, preview) {
+    const cv = $('#snapChart'); if (!cv) return; const [x, W, H] = fitCanvas(cv, 150);
+    const h = t.hist.slice(-240);
+    x.font = '9px "IBM Plex Mono", monospace';
+    if (h.length < 2) { x.fillStyle = '#465366'; x.textAlign = 'center'; x.fillText('събирам ценова история…', W / 2, H / 2); return; }
+    const px = h.map(r => r[1]); let lo = Math.min(...px), hi = Math.max(...px);
+    const lv = P ? [P.entryLow, P.entryHigh, P.chase, P.sl, P.tp[0]] : []; if (pos) lv.push(pos.entry);
+    for (const v of lv) if (v > 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    for (const v of (P ? P.tp.slice(1) : [])) if (v <= hi * 1.35) hi = Math.max(hi, v);
+    const L = 4, Rm = 64, T = 8, B = 14, pw = W - L - Rm, ph = H - T - B;
+    const ll = Math.log(lo * 0.97), lh = Math.log(hi * 1.03);
+    const Y = v => T + ph - (Math.log(v) - ll) / (lh - ll) * ph;
+    const t0 = h[0][0], t1 = Math.max(h[h.length - 1][0], t0 + 1), X = ts => L + (ts - t0) / (t1 - t0) * pw;
+    const line = (v, col, dash, lab) => { if (!(v > 0) || v > hi * 1.031 || v < lo * 0.969) return; const y = Y(v); x.strokeStyle = col; x.setLineDash(dash || []); x.beginPath(); x.moveTo(L, y); x.lineTo(L + pw, y); x.stroke(); x.setLineDash([]); x.fillStyle = col; x.textAlign = 'left'; x.fillText(lab, L + pw + 4, y + 3); };
+    if (P) {
+      x.fillStyle = 'rgba(53,240,141,0.10)'; const ya = Y(P.entryHigh), yb = Y(P.entryLow); x.fillRect(L, ya, pw, yb - ya);
+      line(P.entryHigh, 'rgba(53,240,141,.7)', [2, 3], 'ZONE ▲'); line(P.entryLow, 'rgba(53,240,141,.7)', [2, 3], 'ZONE ▼');
+      line(P.chase, '#ffb13d', [4, 3], 'CHASE'); line(P.sl, '#ff4a67', [], 'SL');
+      P.tp.forEach((v, i) => line(v, '#35f08d', [5, 3], 'TP' + (i + 1)));
+      if (!preview && P.createdAt >= t0) { const xx = X(P.createdAt); x.strokeStyle = 'rgba(174,140,255,.6)'; x.setLineDash([2, 2]); x.beginPath(); x.moveTo(xx, T); x.lineTo(xx, T + ph); x.stroke(); x.setLineDash([]); x.fillStyle = '#ae8cff'; x.textAlign = 'center'; x.fillText('LOCK', xx, H - 3); }
+    }
+    if (pos) line(pos.entry, '#43d9ff', [1, 2], 'ENTRY');
+    x.strokeStyle = '#cdd8e8'; x.lineWidth = 1.3; x.beginPath(); h.forEach((r, i) => { const xx = X(r[0]), yy = Y(r[1]); i ? x.lineTo(xx, yy) : x.moveTo(xx, yy); }); x.stroke(); x.lineWidth = 1;
+    const lr = h[h.length - 1]; x.fillStyle = '#43d9ff'; x.beginPath(); x.arc(X(lr[0]), Y(lr[1]), 2.5, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#465366'; x.textAlign = 'left'; x.fillText(F.px(hi), L + 2, T + 8); x.fillText(F.px(lo), L + 2, T + ph - 2);
+    x.textAlign = 'right'; x.fillText(F.dur(t1 - t0) + ' · log', L + pw, H - 3);
+  },
+  drawEquity(cv, curve) {
+    const [x, W, H] = fitCanvas(cv, 190); x.font = '9px "IBM Plex Mono", monospace';
+    if (curve.length < 1) { x.fillStyle = '#465366'; x.textAlign = 'center'; x.fillText('още няма затворени paper сделки', W / 2, H / 2); return; }
+    const v = [0, ...curve], lo = Math.min(0, ...v), hi = Math.max(0.5, ...v), L = 40, Rm = 10, T = 10, B = 16, pw = W - L - Rm, ph = H - T - B;
+    const X = i => L + i / Math.max(1, v.length - 1) * pw, Y = r => T + ph - (r - lo) / (hi - lo || 1) * ph;
+    x.strokeStyle = '#141d2a'; for (let k = 0; k <= 4; k++) { const r = lo + (hi - lo) * k / 4, y = Y(r); x.beginPath(); x.moveTo(L, y); x.lineTo(L + pw, y); x.stroke(); x.fillStyle = '#465366'; x.textAlign = 'right'; x.fillText(r.toFixed(1) + 'R', L - 4, y + 3); }
+    x.strokeStyle = '#263447'; x.beginPath(); x.moveTo(L, Y(0)); x.lineTo(L + pw, Y(0)); x.stroke();
+    const g = x.createLinearGradient(0, T, 0, T + ph); g.addColorStop(0, 'rgba(53,240,141,.25)'); g.addColorStop(1, 'rgba(53,240,141,0)');
+    x.beginPath(); x.moveTo(X(0), Y(0)); v.forEach((r, i) => x.lineTo(X(i), Y(r))); x.lineTo(X(v.length - 1), Y(0)); x.closePath(); x.fillStyle = g; x.fill();
+    x.strokeStyle = v[v.length - 1] >= 0 ? '#35f08d' : '#ff4a67'; x.lineWidth = 1.5; x.beginPath(); v.forEach((r, i) => i ? x.lineTo(X(i), Y(r)) : x.moveTo(X(i), Y(r))); x.stroke(); x.lineWidth = 1;
+    x.fillStyle = '#465366'; x.textAlign = 'center'; x.fillText(`trades → ${curve.length}`, L + pw / 2, H - 3);
+  }
+};
+
+/* =====================================================================
+   UI — ENTRY LIMITS · TP/SL · MISSED · RESULTS · ESDB
+   ===================================================================== */
+const tbl = (cols, rows, empty) => `<table class="t"><thead><tr>${cols.map(c => `<th class="${c[1] || ''}" title="${esc(c[2] || '')}">${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${cols.length}" class="l" style="padding:16px 10px;color:var(--mut);white-space:normal">${empty || 'Няма данни.'}</td></tr>`}</tbody></table>`;
+const statGrid = items => `<div class="stats">${items.map(([v, l, c]) => `<div><b class="${c || ''}">${v}</b><span>${l}</span></div>`).join('')}</div>`;
+const panel = (title, right, body) => `<div class="panel"><div class="ph"><i>◆</i> ${title}<span class="r">${right || ''}</span></div>${body}</div>`;
+function groupTable(title, groups) {
+  const rows = groups.map(g => `<tr><td class="l">${esc(g.k)}</td><td>${g.n}</td><td class="${g.win >= 50 ? 'up' : 'amb'}">${F.n(g.win, 0)}%</td><td class="${cls(g.avgR)}">${F.r(g.avgR)}</td><td class="${cls(g.sumR)}">${F.r(g.sumR)}</td><td class="${cls(g.pnl)}">$${F.n(g.pnl, 2)}</td></tr>`);
+  return panel(title, '', `<div class="scroll">${tbl([[title.split(' ').pop(), 'l'], ['N'], ['WIN'], ['AVG R'], ['SUM R'], ['PnL']], rows, 'Няма сделки.')}</div>`);
+}
+
+Object.assign(UI, {
+  renderLimits() {
+    const now = Clock.now(), pri = { 'IN ZONE': 0, 'ABOVE ZONE': 1, CHASED: 2 };
+    const L = liveTokens().filter(t => t.plan).sort((a, b) => (pri[a.entryState] ?? 3) - (pri[b.entryState] ?? 3) || b.s.radar - a.s.radar);
+    const rows = L.map(t => {
+      const p = t.plan, [el, ec] = ENTRY_LBL[t.entryState] || ['—', 'dim'], mv = (t.m.price / p.p0 - 1) * 100;
+      return `<tr data-key="${esc(t.key)}" data-go="1"${t.key === S.sel ? ' class="sel"' : ''}><td class="l tok"><b>${tokSym(t)}</b><small>${CH[t.chain] || ''}</small></td><td class="l"><span class="stg s${t.stage}">${STAGE_SHORT[t.stage]}</span></td><td class="${sc(t.s.radar)}">${r0(t.s.radar)}</td><td>${F.px(p.p0)}</td><td>${F.px(t.m.price)}</td><td class="${cls(mv)}">${F.pct(mv)}</td><td class="up">${F.px(p.entryLow)} – ${F.px(p.entryHigh)}</td><td class="amb">${F.px(p.chase)}</td><td class="dn">${F.px(p.sl)} <small class="mut">−${F.n(p.slPct, 1)}%</small></td>${p.tp.map((v, i) => `<td class="up">${F.px(v)} <small class="mut">${p.tpR[i]}R</small></td>`).join('')}<td>${F.usd(p.liqInvalid)}</td><td class="l ${ec}">${el}</td><td>${F.dur(p.ttlMin * 60000 - (now - p.createdAt))}</td><td class="l"><span class="dec ${decClass(t.decision)}">${esc(t.decision)}</span></td><td class="l lock"><b>${p.lock}</b></td></tr>`;
+    });
+    const hist = [];
+    for (const t of S.tokens.values()) for (const p of t.planHist || []) hist.push([t, p]);
+    hist.sort((a, b) => b[1].endedAt - a[1].endedAt);
+    const hrows = hist.slice(0, 40).map(([t, p]) => `<tr data-key="${esc(t.key)}" data-go="1"><td class="l tok"><b>${tokSym(t)}</b></td><td>${F.time(p.createdAt)}</td><td>${F.time(p.endedAt)}</td><td>${F.px(p.p0)}</td><td>${F.px(p.entryLow)} – ${F.px(p.entryHigh)}</td><td>${F.px(p.chase)}</td><td>${F.px(p.sl)}</td><td class="l ${p.endState === 'EXPIRED' ? 'mut' : 'dn'}">${p.endState}</td><td class="l lock"><b>${p.lock}</b></td></tr>`);
+    $('#limits').innerHTML = `<div class="tabnote">Планът се <b>заключва</b> (LOCK hash) в момента на квалификация: entry зона = p0 − (${CFG.plan.zoneTop}…${CFG.plan.zoneBottom})×vol unit, chase = p0 + ${CFG.plan.chase}×vol unit, SL = ${CFG.plan.slMult}×vol unit (${CFG.plan.slMin}–${CFG.plan.slMax}%), TP = ${CFG.plan.tpR.join(' / ')}R от средата на зоната. Нивата не се местят; при EXPIRED/INVALID идва нов план след ${CFG.plan.cooldownMin} мин cooldown.</div>`
+      + tbl([['TOKEN', 'l'], ['STAGE', 'l'], ['RADAR'], ['P0 (lock)'], ['NOW'], ['Δ P0'], ['ENTRY LIMIT'], ['CHASE >'], ['SL'], ['TP1'], ['TP2'], ['TP3'], ['LIQ INVALID <'], ['STATE', 'l'], ['TTL'], ['DECISION', 'l'], ['LOCK', 'l']], rows, 'Няма активни планове. План се създава, когато Radar ≥ ' + CFG.gates.qualify + ', етап 1–3 и Token Risk < ' + CFG.gates.maxTokenRisk + '.')
+      + `<div class="ph" style="border-top:1px solid var(--line)"><i>◆</i> PLAN HISTORY <span class="r">изтекли / инвалидирани планове</span></div>`
+      + tbl([['TOKEN', 'l'], ['LOCKED'], ['ENDED'], ['P0'], ['ENTRY'], ['CHASE'], ['SL'], ['END', 'l'], ['LOCK', 'l']], hrows, 'Още няма приключили планове.');
+  },
+  renderTpsl() {
+    const now = Clock.now();
+    const rows = S.paper.open.map(p => {
+      const ok = Paper.verify(p), eff = Paper.effSL(p), lbl = p.tpHit[1] ? 'TRAIL@TP1' : p.tpHit[0] ? 'BE' : 'HARD';
+      const real = p.exits.reduce((a, e) => a + e.frac * (e.px / p.entry - 1), 0), unreal = p.left * (p.last / p.entry - 1), pnl = (real + unreal) * 100;
+      const rNow = (p.last - p.entry) / p.R, held = (now - p.openedAt) / 60000, t = S.tokens.get(p.key), liqNow = t?.m?.liq;
+      const ts = !p.tpHit[0] ? (held < p.rules.timeStopMin ? `in ${F.dur((p.rules.timeStopMin - held) * 60000)} if &lt;${p.rules.timeStopR}R` : 'armed') : 'off (TP1)';
+      return `<tr data-key="${esc(p.key)}" data-go="1"><td class="l tok"><b>${esc(p.symbol)}</b><small>${p.how}</small></td><td>${F.time(p.openedAt)}</td><td>${F.px(p.entry)}</td><td>${F.px(p.last)}</td><td class="${cls(pnl)}">${F.pct(pnl)}</td><td class="${cls(rNow)}">${F.r(rNow)}</td><td class="dn">${F.px(eff)} <small class="mut">${lbl}</small></td>${p.plan.tp.map((v, i) => `<td class="${p.tpHit[i] ? 'up' : ''}">${p.tpHit[i] ? '✓ ' : ''}${F.px(v)}</td>`).join('')}<td>${Math.round(p.left * 100)}%</td><td class="up">${F.pct(p.mfe)}</td><td class="dn">${F.pct(p.mae)}</td><td>${F.dur(now - p.openedAt)}</td><td class="l mini">${ts}</td><td class="${liqNow && liqNow < p.liqAtEntry * (1 - p.rules.liqStopPct / 200) ? 'amb' : ''}">${liqNow ? F.pct((liqNow / p.liqAtEntry - 1) * 100) : '—'}</td><td class="l ${ok ? 'up' : 'dn'}" title="Hash на entry+SL+TP+rules при входа">${ok ? '✓ ' + p.lock : '✗ TAMPERED'}</td><td><button class="btn sm bad" data-act="close-pos" data-id="${p.id}">CLOSE</button></td></tr>`;
+    });
+    const exits = [];
+    for (const p of [...S.paper.open, ...S.paper.closed.slice(0, 60)]) for (const e of p.exits) exits.push([p, e]);
+    exits.sort((a, b) => b[1].ts - a[1].ts);
+    const erows = exits.slice(0, 40).map(([p, e]) => `<tr data-key="${esc(p.key)}" data-go="1"><td>${F.time(e.ts)}</td><td class="l tok"><b>${esc(p.symbol)}</b></td><td class="l ${e.reason.startsWith('TP') ? 'up' : 'dn'}">${e.reason}</td><td>${Math.round(e.frac * 100)}%</td><td>${F.px(e.px)}</td><td class="${cls(e.px - p.entry)}">${F.pct((e.px / p.entry - 1) * 100)}</td></tr>`);
+    const PP = CFG.paper;
+    $('#tpsl').innerHTML = panel('OPEN PAPER POSITIONS', `${S.paper.open.length}/${PP.maxOpen} · AUTO ${PP.auto ? 'ON' : 'OFF'}`,
+      `<div class="tabnote">TP/SL са <b>заключени в snapshot-а при входа</b> (FOMO PAPER 50 правило) — LOCK hash-ът се проверява при всяко рендериране; ✗ означава, че някой е пипал нивата. Единственото движение на SL е предварително зададеното правило: TP1 → SL = break-even, TP2 → SL = TP1. Изпълнението е по polling (интервалът на цикъла), с модел на slippage за $${PP.size}.</div><div class="scroll">`
+      + tbl([['TOKEN', 'l'], ['OPENED'], ['ENTRY'], ['NOW'], ['P&L'], ['R NOW'], ['STOP'], ['TP1'], ['TP2'], ['TP3'], ['LEFT'], ['MFE'], ['MAE'], ['HELD'], ['TIME STOP', 'l'], ['LIQ Δ'], ['LOCK', 'l'], ['']], rows, 'Няма отворени paper позиции. AUTO влиза, когато решението е ALLOW PAPER и цената е в entry зоната.') + '</div>')
+      + `<div class="cols2" style="margin-top:10px">` + panel('PROTECTIONS · ACTIVE RULES', 'нови позиции взимат тези стойности', `<div class="pb"><ul class="ul">
+        <li><b>HARD SL</b> — ${CFG.plan.slMult}× vol unit, граници ${CFG.plan.slMin}–${CFG.plan.slMax}%.</li>
+        <li><b>TIME STOP</b> — ${PP.timeStopMin} мин без TP1 и под ${PP.timeStopR}R → изход.</li>
+        <li><b>LIQUIDITY STOP</b> — ликвидност −${PP.liqStopPct}% от входа → изход (с двоен slippage).</li>
+        <li><b>TRAILING след TP1</b> — частични изходи ${PP.tpFrac.map(f => Math.round(f * 100) + '%').join(' / ')} на TP1 / TP2 / TP3; SL → BE след TP1, SL → TP1 след TP2.</li>
+        <li><b>MAX HOLD</b> — ${PP.maxHoldMin} мин.</li>
+        <li>Fee ${PP.feePct}% на страна · slippage модел: size / (liq/2 + size).</li></ul></div>`)
+      + panel('RECENT EXITS', 'частични и пълни', `<div class="scroll" style="max-height:320px">${tbl([['TIME'], ['TOKEN', 'l'], ['REASON', 'l'], ['SIZE'], ['PRICE'], ['VS ENTRY']], erows, 'Още няма изходи.')}</div>`) + '</div>';
+  },
+  renderMissed() {
+    const all = S.missed, done = all.filter(r => r.done && r.verdict && r.verdict !== 'NO DATA');
+    const n = v => done.filter(r => r.verdict === v).length, pct = v => done.length ? F.n(n(v) / done.length * 100, 0) + '%' : '—';
+    const ch = done.filter(r => r.type === 'CHASED'), rt = ch.length ? F.n(ch.filter(r => r.retest).length / ch.length * 100, 0) + '%' : '—';
+    const avg = k => done.length ? done.reduce((a, r) => a + (r.out[k] ?? 0), 0) / done.length : null;
+    const rows = all.slice(0, 250).map(r => `<tr data-key="${esc(r.key)}" data-go="1"><td>${F.time(r.at)}</td><td class="l tok"><b>${esc(r.symbol)}</b></td><td class="l ${r.type === 'CHASED' ? 'amb' : 'dn'}">${r.type}</td><td class="l"><span class="stg s${r.stage}">${STAGE_SHORT[r.stage]}</span></td><td>${r0(r.radar)}</td><td>${r0(r.pump)}</td><td>${F.px(r.px)}</td><td>${r.chase ? F.px(r.chase) : '—'}</td><td class="up">+${F.n(r.up, 1)}%</td><td class="dn">−${F.n(r.down, 1)}%</td>${pc(r.out.r5)}${pc(r.out.r15)}${pc(r.out.r60)}${pc(r.out.max)}${pc(r.out.min)}<td class="${r.first === 'UP' ? 'up' : r.first === 'DOWN' ? 'dn' : 'mut'}">${r.first || '—'}</td><td>${r.type === 'CHASED' ? (r.retest ? '<span class="up">YES</span>' : 'no') : '—'}</td><td class="l ${r.verdict === 'RULE SAVED' ? 'up' : r.verdict === 'MISSED WIN' ? 'amb' : 'mut'}">${r.done ? esc(r.verdict) : 'TRACKING ' + F.dur(Clock.now() - r.at)}</td></tr>`);
+    $('#missed').innerHTML = panel('MISSED / CHASED', `${all.length} records · ${all.filter(r => !r.done).length} tracking`,
+      `<div class="tabnote">Всеки път, когато радарът казва <b>DO NOT CHASE</b> (цена над chase лимита) или <b>TOO LATE</b> (етап EXTENDED/EXHAUSTED при силен pump), записваме какво става през следващите 60 мин. <b>RULE SAVED</b> = цената първо удари −SL% преди +TP1% → правилото е спестило загуба. <b>MISSED WIN</b> = първо удари TP1 → правилото е изпуснало печалба. Така мерим дали "не гони" наистина работи.</div>`
+      + statGrid([[all.length, 'RECORDS'], [done.length, 'RESOLVED (60m)'], [pct('RULE SAVED'), 'RULE SAVED', 'up'], [pct('MISSED WIN'), 'MISSED WIN', 'amb'], [pct('FLAT'), 'FLAT'], [rt, 'CHASED → RETEST ZONE', 'cy'], [F.pct(avg('r60')), 'AVG +60m', cls(avg('r60'))], [F.pct(avg('max')), 'AVG MAX 60m', 'up'], [F.pct(avg('min')), 'AVG MIN 60m', 'dn']])
+      + `<div class="btns" style="padding:8px 10px"><button class="btn sm" data-act="missed-csv">EXPORT CSV</button></div><div class="scroll">`
+      + tbl([['AT'], ['TOKEN', 'l'], ['TYPE', 'l'], ['STAGE', 'l'], ['RADAR'], ['PUMP'], ['PRICE'], ['CHASE'], ['+TP1'], ['−SL'], ['+5m'], ['+15m'], ['+60m'], ['MAX'], ['MIN'], ['FIRST'], ['RETEST'], ['VERDICT', 'l']], rows, 'Още няма записи. Появяват се, когато токен премине chase лимита или стигне EXTENDED/EXHAUSTED.') + '</div>');
+  },
+  renderResults() {
+    const f = S.resFilter, all = S.paper.closed, list = f === 'all' ? all : all.filter(p => p.how === f);
+    const st = paperStats(list), auto = all.filter(p => p.how === 'auto').length, tgt = CFG.paper.target;
+    const rows = list.slice(0, 300).map(p => `<tr data-key="${esc(p.key)}" data-go="1"><td>${F.dt(p.closedAt)}</td><td class="l tok"><b>${esc(p.symbol)}</b><small>${p.how}</small></td><td class="l"><span class="stg s${p.snap.stage}">${STAGE_SHORT[p.snap.stage]}</span></td><td>${r0(p.snap.radar)}</td><td class="l"><span class="edge ${p.snap.edge}">${p.snap.edge}</span></td><td>${F.px(p.entry)}</td><td>${F.n(p.slipIn, 2)}%</td><td class="l ${/TP/.test(p.exitReason) ? 'up' : /MANUAL/.test(p.exitReason) ? 'cy' : 'dn'}">${esc(p.exitReason)}</td><td>${p.tpHit.map((h, i) => h ? 'TP' + (i + 1) : '').filter(Boolean).join(' ') || '—'}</td><td class="${cls(p.rMult)}">${F.r(p.rMult)}</td><td class="${cls(p.pnlPct)}">${F.pct(p.pnlPct)}</td><td class="${cls(p.pnlUsd)}">$${F.n(p.pnlUsd, 2)}</td><td class="up">${F.pct(p.mfe)}</td><td class="dn">${F.pct(p.mae)}</td><td>${F.dur(p.holdMin * 60000)}</td><td class="l ${Paper.verify(p) ? 'up' : 'dn'}">${Paper.verify(p) ? '✓' : '✗'} ${p.lock}</td></tr>`);
+    const rb = p => p.snap.radar >= 80 ? 'radar 80+' : p.snap.radar >= 70 ? 'radar 70–80' : 'radar <70';
+    $('#results').innerHTML = panel(`PAPER RESULTS · FOMO PAPER ${auto}/${tgt}`, 'само затворени сделки',
+      `<div class="toolbar">${[['auto', 'AUTO (rule-based)'], ['manual', 'MANUAL'], ['all', 'ALL']].map(([k, l]) => `<button class="chip ${f === k ? 'on' : ''}" data-act="res-filter" data-v="${k}">${l}</button>`).join('')}<span class="spacer"></span><button class="btn sm" data-act="paper-csv">EXPORT CSV</button><button class="btn sm" data-act="backup">EXPORT BACKUP JSON</button></div>
+       <div class="pb"><div class="mini">FOMO PAPER ${tgt}: честната извадка са само <b class="vi">AUTO</b> сделките — влизат по правило, TP/SL заключени при входа. Ръчните се мерят отделно.</div><div class="prog"><i style="width:${Math.min(100, auto / tgt * 100)}%"></i></div><div class="mini">${auto}/${tgt} · ${auto >= tgt ? 'извадката е пълна — време за ревю на правилата' : 'още ' + (tgt - auto) + ' до пълна извадка'}${auto < 20 ? ' · под 20 сделки статистиката е шум' : ''}</div></div>`
+      + statGrid([[st.n || 0, 'TRADES'], [st.n ? F.n(st.win, 0) + '%' : '—', 'WIN RATE', st.n ? (st.win >= 50 ? 'up' : 'amb') : ''], [st.n ? F.r(st.avgR) : '—', 'EXPECTANCY (avg R)', cls(st.avgR)], [st.n ? F.r(st.sumR) : '—', 'TOTAL R', cls(st.sumR)], [st.n ? '$' + F.n(st.pnl, 2) : '—', 'NET PnL', cls(st.pnl)], [st.pf != null ? F.n(st.pf, 2) : '—', 'PROFIT FACTOR'], [st.n ? F.r(st.mdd) : '—', 'MAX DD (R)', 'dn'], [st.n ? F.dur(st.hold * 60000) : '—', 'AVG HOLD'], [st.n ? F.pct(st.mfe) : '—', 'AVG MFE', 'up'], [st.n ? F.pct(st.mae) : '—', 'AVG MAE', 'dn'], [st.n ? F.r(st.best) : '—', 'BEST', 'up'], [st.n ? F.r(st.worst) : '—', 'WORST', 'dn']])
+      + `<div class="pb"><canvas class="chart" id="equity"></canvas></div>`)
+      + `<div class="cols3" style="margin-top:10px">${groupTable('BY EXIT', groupStats(list, p => p.exitReason))}${groupTable('BY STAGE', groupStats(list, p => STAGES[p.snap.stage]))}${groupTable('BY EDGE', groupStats(list, p => p.snap.edge))}</div>`
+      + `<div class="cols3" style="margin-top:10px">${groupTable('BY RADAR', groupStats(list, rb))}${groupTable('BY ENTRY STATE', groupStats(list, p => p.snap.entryState || '—'))}${groupTable('BY HOW', groupStats(all, p => p.how))}</div>`
+      + `<div class="gap"></div>` + panel('CLOSED TRADES', `${list.length}`, `<div class="scroll" style="max-height:560px">${tbl([['CLOSED'], ['TOKEN', 'l'], ['STAGE', 'l'], ['RADAR'], ['EDGE', 'l'], ['ENTRY'], ['SLIP'], ['EXIT', 'l'], ['TPs'], ['R'], ['P&L %'], ['P&L $'], ['MFE'], ['MAE'], ['HOLD'], ['LOCK', 'l']], rows, 'Още няма затворени сделки.')}</div>`);
+    this.drawEquity($('#equity'), st.curve || []);
+  },
+  renderEsdb() {
+    const a = ESDB.analysis(), H = CFG.esdb.hitPct, Su = CFG.esdb.sustainPct;
+    const warn = a.n < 50 ? `<div class="callout" style="margin:8px 10px">Извадка ${a.n} завършени сигнала. Под 50–100 изводите са шум — гледай тенденцията, не решавай още.</div>` : '';
+    const brow = a.buckets.map(b => `<tr><td class="l">ESS ${b.label}</td><td>${b.n}</td><td class="${b.hit != null && a.base.hit != null && b.hit > a.base.hit ? 'up' : ''}">${b.hit != null ? F.n(b.hit, 0) + '%' : '—'}</td><td>${b.sus != null ? F.n(b.sus, 0) + '%' : '—'}</td>${pc(b.r60)}${pc(b.max60)}</tr>`);
+    const lrow = a.rows.map(r => r.lift == null ? `<tr><td class="l">${r.label}</td><td>${r.n}</td><td colspan="7" class="l mut">нужни ≥ 6 завършени сигнала</td></tr>` : `<tr><td class="l">${r.label}</td><td>${r.n}</td><td>${Math.abs(r.med) >= 1000 ? F.usd(r.med) : F.n(r.med, 2)}</td><td>${F.n(r.hitHi, 0)}% <small class="mut">n${r.nHi}</small></td><td>${F.n(r.hitLo, 0)}% <small class="mut">n${r.nLo}</small></td><td class="${r.lift > 5 ? 'up' : r.lift < -5 ? 'dn' : 'mut'}"><b>${r.lift > 0 ? '+' : ''}${F.n(r.lift, 0)}pp</b></td><td>${F.n(r.susHi, 0)}% / ${F.n(r.susLo, 0)}%</td>${pc(r.r60Hi)}${pc(r.r60Lo)}</tr>`);
+    const recs = S.esdb.slice(0, 250).map(r => `<tr data-key="${esc(r.key)}" data-go="1"><td>${F.dt(r.ts)}</td><td class="l tok"><b>${esc(r.symbol)}</b></td><td class="${sc(r.ess)}">${r0(r.ess)}</td><td class="l"><span class="stg s${r.stage}">${STAGE_SHORT[r.stage]}</span></td><td>${F.usd(r.liq)}</td><td>${F.age(r.ageMin)}</td><td>${F.x(r.bsr5, 1)}</td><td>${F.x(r.txAccel, 1)}</td><td>${F.x(r.volAccel, 1)}</td><td>${r.nSrc}</td><td>${r.fomoTraders || 0}</td>${pc(r.chgH1)}${pc(r.out.r5)}${pc(r.out.r15)}${pc(r.out.r60)}${pc(r.out.max60)}${pc(r.out.min60)}<td class="l ${r.expired ? 'mut' : r.done ? (r.out.max60 >= H ? 'up' : '') : 'cy'}">${r.expired ? 'NO DATA' : r.done ? (r.out.max60 >= H ? 'HIT' : 'miss') : 'TRACKING'}</td></tr>`);
+    $('#esdb').innerHTML = panel('EARLY SIGNAL DATABASE', `${a.total} signals · ${a.n} resolved · ${a.pending} tracking`,
+      `<div class="tabnote">Всеки нов токен (liq ≥ ${F.usd(CFG.filters.minLiqDiscovery)}) се записва с ранните си признаци в момента на откриване, после се следи +5 / +15 / +60 мин. <b>HIT</b> = максимум ≥ +${H}% в рамките на 60 мин; <b>SUSTAIN</b> = още ≥ +${Su}% на 60-ата минута. <b>LIFT</b> = hit rate над медианата минус hit rate под медианата — показва кои ранни признаци наистина предхождат устойчив pump и кои са шум.</div>${warn}`
+      + statGrid([[a.total, 'SIGNALS'], [a.n, 'RESOLVED 60m'], [a.pending, 'TRACKING', 'cy'], [a.base.hit != null ? F.n(a.base.hit, 0) + '%' : '—', `BASE HIT (≥+${H}%)`, 'up'], [a.base.sus != null ? F.n(a.base.sus, 0) + '%' : '—', `SUSTAIN (≥+${Su}% @60m)`], [F.pct(a.base.r60), 'AVG +60m', cls(a.base.r60)]])
+      + `<div class="btns" style="padding:8px 10px"><button class="btn sm" data-act="esdb-csv">EXPORT CSV</button></div>`)
+      + `<div class="cols2" style="margin-top:10px">` + panel('BY EARLY SIGNAL SCORE', 'калибрация на ESS', `<div class="scroll">${tbl([['BUCKET', 'l'], ['N'], ['HIT'], ['SUSTAIN'], ['AVG +60m'], ['AVG MAX']], brow)}</div>`)
+      + panel('FEATURE LIFT', 'медианно разделяне', `<div class="scroll">${tbl([['FEATURE', 'l'], ['N'], ['MEDIAN'], ['HIT >MED'], ['HIT ≤MED'], ['LIFT'], ['SUSTAIN hi/lo'], ['+60m >MED'], ['+60m ≤MED']], lrow)}</div>`) + '</div><div class="gap"></div>'
+      + panel('RECORDS', 'последни 250', `<div class="scroll" style="max-height:560px">${tbl([['DETECTED'], ['TOKEN', 'l'], ['ESS'], ['STAGE', 'l'], ['LIQ'], ['AGE'], ['B/S'], ['TX ACC'], ['VOL ACC'], ['SRC'], ['FOMO'], ['Δ1h@det'], ['+5m'], ['+15m'], ['+60m'], ['MAX60'], ['MIN60'], ['RESULT', 'l']], recs, 'Още няма записи.')}</div>`);
+  }
+});
+
+/* =====================================================================
+   UI — RESEARCH · ERRORS · CONFIG · EVENTS · BOOT
+   ===================================================================== */
+const RS_STATUS = ['WATCH', 'INVESTIGATING', 'CONFIRMED', 'REJECTED', 'ARCHIVED'];
+const CFG_SCHEMA = [
+  ['ОБЩИ', [
+    ['mode', 'Режим', 'sel', ['live', 'sim'], 'LIVE = реални API · SIM = синтетичен пазар само за тест на логиката (не се записва)'],
+    ['chains', 'Вериги', 'chains', null, 'Discovery само по избраните вериги'],
+    ['refreshSec', 'Цикъл LIVE (сек)', 'num', [8, 600], 'Под 15 сек рискуваш 429 от GeckoTerminal'],
+    ['sim.tickMs', 'SIM стъпка (ms)', 'num', [100, 10000], '1 стъпка = 30 сек пазарно време']
+  ]],
+  ['ИЗТОЧНИЦИ', [
+    ['src.dexProfiles', 'DEX: latest token profiles', 'bool'], ['src.dexBoosts', 'DEX: latest boosts', 'bool'], ['src.dexTop', 'DEX: top boosts', 'bool'], ['src.dexCto', 'DEX: community takeovers', 'bool'],
+    ['src.gtNew', 'GeckoTerminal: new pools', 'bool'], ['src.gtTrending', 'GeckoTerminal: trending pools', 'bool'], ['src.gtEnrich', 'GeckoTerminal: unique buyers/sellers (top 30)', 'bool'],
+    ['src.cgTrending', 'CoinGecko: trending', 'bool', null, 'Само съвпадение по символ — слаб сигнал'],
+    ['src.birdeye', 'Birdeye (ключ)', 'bool', null, 'new listings, trending, token security'], ['@birdeye', 'Birdeye API key', 'pass', null, 'Пази се само в този браузър, не влиза в експортите'],
+    ['be.base', 'Birdeye base URL', 'text', null, 'Или адреса на твоя proxy (…/birdeye)'],
+    ['src.fomo', 'FOMO API (ключ)', 'bool', null, 'Неофициален FOMO API — може да изисква proxy заради CORS'], ['@fomo', 'FOMO API key', 'pass', null, 'Не го качвай в публично репо'],
+    ['fomo.base', 'FOMO API base URL', 'text', null, 'Или адреса на твоя proxy (Cloudflare Worker)'], ['fomo.window', 'Leaderboard прозорец', 'sel', ['24h', '7d', '30d', 'all']],
+    ['fomo.topTraders', 'Top трейдъри от leaderboard', 'num', [0, 50]], ['fomo.perCycle', 'Трейдъри на цикъл', 'num', [1, 10], 'Колко swap истории се дърпат на цикъл (rate limit)'],
+    ['fomo.handles', 'Следени handles', 'text', null, 'Разделени със запетая, напр. @trader1, trader2']
+  ]],
+  ['DISCOVERY', [['filters.minLiqDiscovery', 'Мин. ликвидност за discovery ($)', 'num', [0, 1e8]], ['filters.maxAgeH', 'Макс. възраст на пула (ч)', 'num', [1, 10000]], ['filters.universeCap', 'Макс. токени в universe', 'num', [20, 600]]]],
+  ['GATES / РЕШЕНИЯ', [
+    ['gates.minLiq', 'Мин. ликвидност за изпълнение ($)', 'num', [0, 1e8]], ['gates.minAgeMin', 'Мин. възраст (мин)', 'num', [0, 1440]], ['gates.maxTokenRisk', 'Макс. Token Risk', 'num', [0, 100]], ['gates.maxSlipRisk', 'Макс. Slippage Risk', 'num', [0, 100]],
+    ['gates.qualify', 'Radar праг за план (QUALIFY)', 'num', [0, 100]], ['gates.paper', 'Radar праг за ALLOW PAPER', 'num', [0, 100]], ['gates.investigate', 'Radar праг за INVESTIGATE', 'num', [0, 100]], ['gates.minCopy', 'Мин. Copyability', 'num', [0, 100]],
+    ['gates.allowStage3', 'Позволи paper в BREAKOUT', 'bool', null, 'По подразбиране само EARLY / DEVELOPING']
+  ]],
+  ['ENTRY / TP / SL', [
+    ['plan.zoneTop', 'Зона горе (× vol unit)', 'num', [0, 5]], ['plan.zoneBottom', 'Зона долу (× vol unit)', 'num', [0, 10]], ['plan.chase', 'Chase лимит (× vol unit над p0)', 'num', [0, 10]],
+    ['plan.slMult', 'SL (× vol unit)', 'num', [0.2, 10]], ['plan.slMin', 'SL мин %', 'num', [0.5, 90]], ['plan.slMax', 'SL макс %', 'num', [1, 95]],
+    ['plan.tpR', 'TP1/TP2/TP3 в R', 'list', 3, 'напр. 1.5, 3, 5'], ['plan.ttlMin', 'Валидност на плана (мин)', 'num', [1, 1440]], ['plan.volMin', 'Vol unit мин %', 'num', [0.1, 50]], ['plan.volMax', 'Vol unit макс %', 'num', [0.5, 100]], ['plan.cooldownMin', 'Cooldown след изтекъл план (мин)', 'num', [0, 240]]
+  ]],
+  ['PAPER ENGINE', [
+    ['paper.auto', 'AUTO paper при ALLOW + IN ZONE', 'bool'], ['paper.size', 'Размер ($)', 'num', [1, 100000]], ['paper.refSize', 'Референтен размер за slippage risk ($)', 'num', [1, 1e7]], ['paper.feePct', 'Fee % на страна', 'num', [0, 5]],
+    ['paper.maxOpen', 'Макс. отворени', 'num', [1, 50]], ['paper.tpFrac', 'Частични изходи TP1/TP2/TP3', 'list', 3, 'дялове, сбор 1.0 — напр. 0.4, 0.3, 0.3'],
+    ['paper.timeStopMin', 'Time stop (мин)', 'num', [1, 1440]], ['paper.timeStopR', 'Time stop праг (R)', 'num', [-5, 5]], ['paper.liqStopPct', 'Liquidity stop (−%)', 'num', [1, 90]], ['paper.maxHoldMin', 'Max hold (мин)', 'num', [5, 10080]], ['paper.target', 'FOMO PAPER цел (сделки)', 'num', [5, 1000]]
+  ]],
+  ['EARLY EDGE · ESDB', [
+    ['edge.goodRunup', 'GOOD: Δ1h при откриване под %', 'num', [0, 1000]], ['edge.lostRunup', 'LOST: Δ1h при откриване над %', 'num', [0, 5000]], ['edge.goodMove', 'GOOD: движение до fill под %', 'num', [0, 1000]], ['edge.lostMove', 'LOST: движение до fill над %', 'num', [0, 5000]],
+    ['esdb.hitPct', 'ESDB HIT: макс. ≥ +% за 60 мин', 'num', [1, 1000]], ['esdb.sustainPct', 'ESDB SUSTAIN: ≥ +% на 60-ата мин', 'num', [1, 1000]], ['esdb.cap', 'ESDB макс. записи', 'num', [100, 20000]]
+  ]]
+];
+const cfgId = p => 'cfg_' + p.replace(/[.@]/g, '_');
+
+Object.assign(UI, {
+  /* ---------- RESEARCH ---------- */
+  renderResearch(force) {
+    const box = $('#research'); if (!force && box.contains(document.activeElement)) return;
+    if (!S.research.length) { box.innerHTML = '<div class="empty">Няма проучвания. Добави адрес горе или натисни SAVE RESEARCH / INVESTIGATE в snapshot-а на токен.</div>'; return; }
+    box.innerHTML = S.research.map(r => {
+      const t = S.tokens.get(r.key), m = t && t.m, d = m && r.priceAtAdd ? (m.price / r.priceAtAdd - 1) * 100 : null;
+      return `<div class="rs"><div class="rs-h"><h4>${esc(r.symbol)}</h4><span class="mini">${esc(r.chain)} · ${esc(F.short(r.address))} · добавен ${F.dt(r.createdAt)}</span>
+        <select data-rs="status" data-id="${r.id}" aria-label="Статус">${RS_STATUS.map(s => `<option ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <label class="mini"><input type="checkbox" data-rs="track" data-id="${r.id}" ${r.track ? 'checked' : ''}> TRACK</label>
+        <span class="spacer"></span>
+        <button class="btn sm" data-act="rs-open" data-k="${esc(r.key)}" ${m ? '' : 'disabled'}>OPEN</button><button class="btn sm vi" data-act="rs-handoff" data-id="${r.id}" ${m ? '' : 'disabled'}>HANDOFF → AGENT</button><button class="btn sm bad" data-act="rs-remove" data-id="${r.id}">REMOVE</button></div>
+        <div class="rs-meta" style="margin-top:6px"><span><i>price @add</i>${F.px(r.priceAtAdd)}</span><span><i>now</i>${m ? F.px(m.price) : r.track ? 'чакам данни…' : '—'}</span><span><i>Δ</i><b class="${cls(d)}">${F.pct(d)}</b></span><span><i>radar @add</i>${r0(r.radarAtAdd)}</span><span><i>radar now</i>${t && t.s ? r0(t.s.radar) : '—'}</span><span><i>stage</i>${t && t.stage != null ? STAGES[t.stage] : '—'}</span><span><i>decision</i>${t && t.decision ? `<span class="dec ${decClass(t.decision)}">${esc(t.decision)}</span>` : '—'}</span><span><i>liq</i>${m ? F.usd(m.liq) : '—'}</span></div>
+        <div class="rs-body"><div style="display:grid;gap:6px"><label class="f">Теза / защо е интересен<textarea data-rs="thesis" data-id="${r.id}" rows="3">${esc(r.thesis)}</textarea></label><label class="f">Тагове<input type="text" data-rs="tags" data-id="${r.id}" value="${esc(r.tags)}" placeholder="narrative, dev, whale…"></label></div>
+        <div style="display:grid;gap:6px"><div class="row"><input type="text" data-note-for="${r.id}" placeholder="нова бележка (Enter)" style="flex:1"><button class="btn sm go" data-act="rs-note" data-id="${r.id}">ADD NOTE</button></div><div class="notes">${r.notes.map(n => `<p><time>${F.dt(n.ts)}</time>${esc(n.text)}</p>`).join('') || '<p class="mut">Няма бележки.</p>'}</div></div></div></div>`;
+    }).join('');
+  },
+  /* ---------- ERRORS ---------- */
+  renderErrors() {
+    const srcs = CFG.mode === 'sim' ? ['SIM'] : ['DEX', 'GT', 'CG', 'BE', 'FOMO'];
+    const hrows = srcs.map(k => { const st = S.api[k]; const h = k === 'SIM' ? 'ok' : API.health(k), lat = API.avgLat(k); return `<tr><td class="l"><i class="light ${h}"></i> ${k}</td><td>${st ? st.calls : 0}</td><td class="up">${st ? st.ok : 0}</td><td class="${st && st.err ? 'dn' : ''}">${st ? st.err : 0}</td><td>${lat ? Math.round(lat) + 'ms' : '—'}</td><td>${st && st.lastOk ? F.time(st.lastOk) : '—'}</td><td class="l dn">${st && st.lastErr ? esc(st.lastErr) + ' · ' + F.time(st.lastErrTs) : '—'}</td><td>${st && Date.now() < st.backoffUntil ? Math.ceil((st.backoffUntil - Date.now()) / 1000) + 's' : '—'}</td></tr>`; });
+    $('#errorsTop').innerHTML = panel('API HEALTH', CFG.mode === 'sim' ? 'SIM режим — API не се викат (TEST APIs проверява реалните)' : 'обновява се всеки цикъл',
+      `<div class="toolbar"><button class="btn go" data-act="api-test">TEST APIs</button><button class="btn" data-act="err-export">EXPORT LOG JSON</button><button class="btn bad" data-act="err-clear">CLEAR LOG</button><span class="mini">Червено DEX/GT/CG при отваряне от диск (file://) или корпоративна мрежа = CORS/мрежа. Birdeye/FOMO често изискват proxy.</span></div><div class="scroll">${tbl([['SOURCE', 'l'], ['CALLS'], ['OK'], ['ERR'], ['AVG LAT'], ['LAST OK'], ['LAST ERROR', 'l'], ['BACKOFF']], hrows)}</div>`);
+    const lv = S.errFilter.level, so = S.errFilter.source, allSrc = [...new Set(S.errors.map(e => e.source))].sort();
+    $('#errFilters').innerHTML = ['ALL', 'ERROR', 'WARN', 'INFO'].map(l => `<button class="chip ${lv === l ? 'on' : ''}" data-act="err-level" data-v="${l}">${l} ${l === 'ALL' ? S.errors.length : S.errors.filter(e => e.level === l).length}</button>`).join('') + `<select data-err-src aria-label="Източник"><option value="ALL">всички източници</option>${allSrc.map(s => `<option ${s === so ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>`;
+    const list = S.errors.filter(e => (lv === 'ALL' || e.level === lv) && (so === 'ALL' || e.source === so)).slice(0, 400);
+    $('#errList').innerHTML = list.map(e => `<div class="err-row"><time class="mut">${F.dt(e.ts)}</time><b class="lv-${e.level}">${e.level}</b><span>${esc(e.source)}</span><span class="mut">${esc(e.code)}${e.count > 1 ? ' ×' + e.count : ''}</span><span>${esc(e.msg)}</span>${e.detail ? (e.detail.length > 260 ? `<details class="d"><summary>${esc(e.detail.slice(0, 160))}… (${e.detail.length} знака)</summary><pre style="white-space:pre-wrap;margin:4px 0">${esc(e.detail)}</pre></details>` : `<div class="d">${esc(e.detail)}</div>`) : ''}</div>`).join('') || '<div class="empty">Няма записи — чисто.</div>';
+    $('#errInfo').textContent = `${list.length} shown`;
+  },
+  saveBug() {
+    const title = $('#bugTitle').value.trim(); if (!title) { toast('Опиши какво се случи.'); $('#bugTitle').focus(); return; }
+    const t = S.sel && S.tokens.get(S.sel);
+    const env = `v${VERSION} · ${CFG.mode} · cycle #${S.cycles} · tokens ${S.tokens.size} · ${innerWidth}x${innerHeight} · ${navigator.userAgent}`;
+    const snap = $('#bugSnap').checked && t ? JSON.stringify({ key: t.key, symbol: t.symbol, market: t.m, scores: t.s && { radar: t.s.radar, ess: t.s.ess, pq: t.s.pq, copy: t.s.copy, risk: t.s.risk }, stage: t.stage, decision: t.decision, reasons: t.reasons, entryState: t.entryState, plan: t.plan, t: t.t }) : '';
+    S.errors.unshift({ id: uid(), ts: Date.now(), level: $('#bugLevel').value, source: 'USER', code: 'BUG · ' + $('#bugModule').value, msg: title, detail: [$('#bugSteps').value.trim(), env, snap].filter(Boolean).join('\n').slice(0, 6000), count: 1, bug: true });
+    $('#bugTitle').value = ''; $('#bugSteps').value = ''; persist(true); this.renderErrors(); this.renderKpis(); toast('Бъгът е записан в ERROR LOG');
+  },
+  async testApis() {
+    toast('Тествам API…', 8000);
+    const base = String(CFG.fomo.base || '').replace(/\/$/, '');
+    const tests = [['DEX', DEX + '/token-profiles/latest/v1'], ['GT', GT + '/networks?page=1', { headers: { accept: 'application/json' } }], ['CG', 'https://api.coingecko.com/api/v3/ping']];
+    if (SECRETS.birdeye) tests.push(['BE', beBase() + '/defi/price?address=So11111111111111111111111111111111111111112', { headers: { 'X-API-KEY': SECRETS.birdeye, 'x-chain': 'solana', accept: 'application/json' } }]);
+    if (SECRETS.fomo) tests.push(['FOMO', `${base}/api/leaderboard/${encodeURIComponent(CFG.fomo.window)}?limit=1`, { headers: { 'X-API-Key': SECRETS.fomo, accept: 'application/json' } }]);
+    const res = await Promise.all(tests.map(async ([src, u, o]) => { API.st(src).backoffUntil = 0; const t0 = performance.now(); const j = await API.get(src, u, o); return `${src} ${j ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`; }));
+    const msg = res.join(' · ') + (SECRETS.birdeye ? '' : ' · BE: няма ключ') + (SECRETS.fomo ? '' : ' · FOMO: няма ключ');
+    Log.add(res.some(r => r.includes('FAIL')) ? 'WARN' : 'INFO', 'APP', 'API_TEST', msg); toast(msg, 6000); this.renderErrors(); this.renderLights();
+  },
+  /* ---------- CONFIG ---------- */
+  renderConfig() {
+    const box = $('#config'); if (box.contains(document.activeElement)) return;
+    const field = ([p, label, type, opt, help]) => {
+      const id = cfgId(p), v = p[0] === '@' ? (SECRETS[p.slice(1)] || '') : getPath(CFG, p); let inp;
+      if (type === 'bool') inp = `<input type="checkbox" id="${id}" ${v ? 'checked' : ''}>`;
+      else if (type === 'sel') inp = `<select id="${id}">${opt.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+      else if (type === 'chains') inp = `<div class="chains">${['solana', 'base', 'bsc', 'ethereum'].map(c => `<label class="mini"><input type="checkbox" data-chain="${c}" ${CFG.chains.includes(c) ? 'checked' : ''}> ${CH[c]}</label>`).join('')}</div>`;
+      else if (type === 'list') inp = `<input type="text" id="${id}" value="${esc((v || []).join(', '))}">`;
+      else if (type === 'pass') inp = `<input type="password" id="${id}" value="${esc(v)}" autocomplete="off" placeholder="${v ? '' : 'няма'}">`;
+      else if (type === 'num') inp = `<input type="number" id="${id}" value="${esc(v)}" step="any">`;
+      else inp = `<input type="text" id="${id}" value="${esc(v)}">`;
+      return `<label for="${id}">${label}${help ? `<small>${esc(help)}</small>` : ''}</label><div>${inp}</div>`;
+    };
+    box.innerHTML = `<div class="panel" style="margin-bottom:10px"><div class="toolbar"><button class="btn go" data-act="cfg-save">SAVE CONFIG</button><button class="btn" data-act="cfg-reset">RESET DEFAULTS</button><span class="spacer"></span><button class="btn" data-act="backup">EXPORT BACKUP</button><button class="btn" data-act="cfg-import">IMPORT BACKUP</button><button class="btn bad" data-act="cfg-wipe">WIPE LIVE DATA</button><input type="file" id="impFile" accept="application/json,.json" hidden></div>
+      <div class="tabnote">Всичко (paper, research, ESDB, missed, error log) се пази в <b>localStorage на този браузър</b>, в отделни пространства за LIVE и SIM (SIM не се записва). API ключовете са отделно и <b>не влизат в експортите</b>. Прави редовно EXPORT BACKUP — изчистване на браузъра трие данните.</div></div>
+      <div class="cfg">${CFG_SCHEMA.map(([title, fields]) => `<div class="panel"><div class="ph"><i>◆</i> ${title}</div><div class="pb">${fields.map(field).join('')}</div></div>`).join('')}</div>`;
+  },
+  saveConfig() {
+    const next = JSON.parse(JSON.stringify(CFG)), sec = { ...SECRETS }, bad = [];
+    for (const [, fields] of CFG_SCHEMA) for (const [p, label, type, opt] of fields) {
+      if (type === 'chains') { const ch = $$('#config [data-chain]').filter(i => i.checked).map(i => i.dataset.chain); if (!ch.length) bad.push('поне една верига'); else next.chains = ch; continue; }
+      const el = $('#' + cfgId(p)); if (!el) continue;
+      if (p[0] === '@') { sec[p.slice(1)] = el.value.trim(); continue; }
+      if (type === 'bool') setPath(next, p, el.checked);
+      else if (type === 'num') { const v = parseFloat(el.value); if (!isFinite(v) || (opt && (v < opt[0] || v > opt[1]))) bad.push(`${label} (${opt ? opt[0] + '–' + opt[1] : 'число'})`); else setPath(next, p, v); }
+      else if (type === 'list') { const a = el.value.split(/[,;\s]+/).map(parseFloat).filter(isFinite); if (a.length !== opt) bad.push(`${label}: трябват ${opt} числа`); else setPath(next, p, a); }
+      else setPath(next, p, el.value.trim());
+    }
+    const fr = next.paper.tpFrac.reduce((a, b) => a + b, 0); if (Math.abs(fr - 1) > 0.02) bad.push('частичните изходи трябва да са сбор 1.0');
+    if (!(next.plan.tpR[0] < next.plan.tpR[1] && next.plan.tpR[1] < next.plan.tpR[2])) bad.push('TP R трябва да растат');
+    if (next.plan.slMin > next.plan.slMax || next.plan.volMin > next.plan.volMax) bad.push('мин > макс');
+    if (bad.length) { toast('Не е записано: ' + bad.join(' · '), 6000); return; }
+    const reload = next.mode !== CFG.mode || next.chains.join() !== CFG.chains.join();
+    CFG = next; SECRETS = sec; saveCfg(); saveSecrets();
+    Log.add('INFO', 'APP', 'CONFIG', 'Конфигурацията е записана'); persist(true);
+    if (reload) { toast('Записано — презареждам…'); setTimeout(() => { location.href = location.pathname + (CFG.mode === 'sim' ? '?mode=sim' : '') + '#config'; }, 500); return; }
+    schedule(); toast('Записано. Новите позиции ползват новите правила; отворените остават с заключените си.'); this.render();
+  },
+  async importBackup(file) {
+    try {
+      const j = JSON.parse(await file.text());
+      if (!j || j.schema !== 'pumpcall.backup.v1') { toast('Това не е PumpCall backup файл'); return; }
+      if (!confirm(`Импорт на backup от ${j.exportedAt || '?'}: ${j.paper?.closed?.length || 0} сделки, ${j.research?.length || 0} проучвания, ${j.esdb?.length || 0} ESDB записа.\nТекущите LIVE данни ще бъдат заменени. Продължи?`)) return;
+      const k = n => `pcr:v1:live:${n}`, set = (n, v) => localStorage.setItem(k(n), JSON.stringify(v));
+      set('paper', j.paper || { open: [], closed: [] }); set('missed', j.missed || []); set('esdb', j.esdb || []); set('research', j.research || []); set('errors', j.errors || []); set('events', j.events || []); set('tokens', j.tokens || []);
+      if (j.cfg) { const c = deepMerge(DEFAULT_CFG, j.cfg); c.mode = 'live'; localStorage.setItem('pcr:v1:cfg', JSON.stringify(c)); }
+      S.paused = true; toast('Импортирано — презареждам в LIVE…'); setTimeout(() => { location.href = location.pathname; }, 600);
+    } catch (e) { toast('Грешка при импорт: ' + e.message, 5000); Log.add('ERROR', 'APP', 'IMPORT', e.message); }
+  },
+  wipeLive() {
+    if (!confirm('Изтриване на ВСИЧКИ LIVE данни (paper, research, ESDB, missed, log) от този браузър? Направи EXPORT BACKUP преди това.')) return;
+    Object.keys(localStorage).filter(k => k.startsWith('pcr:v1:live:')).forEach(k => localStorage.removeItem(k));
+    S.paused = true; clearInterval(S._timer); toast('Изтрито — презареждам…'); setTimeout(() => location.reload(), 500);
+  },
+
+  /* ---------- EVENTS ---------- */
+  bind() {
+    document.addEventListener('click', e => {
+      const tb = e.target.closest('[data-tab]'); if (tb) { this.tab(tb.dataset.tab); return; }
+      const a = e.target.closest('[data-act]'); if (a) { if (!a.disabled) this.act(a.dataset.act, a); return; }
+      const th = e.target.closest('th[data-sort]'); if (th) { const c = th.dataset.sort; S.sort = S.sort.col === c ? { col: c, dir: -S.sort.dir } : { col: c, dir: c === 'sym' ? 1 : -1 }; this.renderTable(); return; }
+      const row = e.target.closest('[data-key]'); if (row && row.dataset.key && !e.target.closest('a,input,select,textarea')) this.select(row.dataset.key);
+    });
+    $('#q').addEventListener('input', e => { S.filter.q = e.target.value; this.renderTable(); });
+    document.addEventListener('change', e => {
+      const el = e.target;
+      if (el.matches('[data-rs]')) { const r = Research.get(el.dataset.id); if (!r) return; const f = el.dataset.rs; r[f] = f === 'track' ? el.checked : el.value; if (f === 'track' && r.track && !S.tokens.has(r.key)) S.tokens.set(r.key, newToken(r.key, r.chain, r.address)); persist(true); if (f === 'status' || f === 'track') { el.blur(); this.renderResearch(true); } return; }
+      if (el.matches('[data-err-src]')) { S.errFilter.source = el.value; this.renderErrors(); return; }
+      if (el.id === 'impFile' && el.files[0]) this.importBackup(el.files[0]);
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.matches('[data-note-for]')) { e.preventDefault(); this.addNote(e.target.dataset.noteFor); }
+      if (e.key === 'Enter' && e.target.id === 'rsAddr') { e.preventDefault(); this.act('rs-add'); }
+      if (e.key === '/' && !e.target.closest('input,textarea,select')) { e.preventDefault(); if (S.tab !== 'live') this.tab('live'); $('#q').focus(); }
+    });
+    let lt = null; onLogHook = () => { if (lt) return; lt = setTimeout(() => { lt = null; try { this.renderKpis(); this.renderTabs(); if (S.tab === 'errors') this.renderErrors(); } catch (e) { } }, 500); };
+  },
+  addNote(id) {
+    const r = Research.get(id), inp = $(`[data-note-for="${id}"]`); if (!r || !inp || !inp.value.trim()) return;
+    r.notes.unshift({ ts: Date.now(), text: inp.value.trim() }); inp.value = ''; persist(true); inp.blur(); this.renderResearch(true);
+  },
+  act(a, el) {
+    const t = S.sel && S.tokens.get(S.sel);
+    switch (a) {
+      case 'scan': if (S.scanning) toast('Сканирането вече върви…'); else cycle(); break;
+      case 'pause': S.paused = !S.paused; this.renderHeader(); Radar.kick(); toast(S.paused ? 'PAUSED — данните не се обновяват' : 'RESUMED'); break;
+      case 'dec': S.filter.dec = el.dataset.v; this.renderLive(); break;
+      case 'paper': {
+        if (!t || !t.m) return;
+        if (S.paper.open.some(p => p.key === t.key)) { toast('Вече има отворена позиция'); return; }
+        if (t.entryState === 'CHASED' && !confirm('Цената е над CHASE лимита. Това е точно влизането, от което радарът пази. Да го запиша ли като MANUAL (CHASED) paper?')) return;
+        if (t.decision === 'REJECT' && !confirm('Решението е REJECT (' + (t.reasons || []).join(', ') + '). Ръчен paper въпреки това?')) return;
+        const p = Paper.open(t, 'manual'); if (p) { persist(true); toast(`MANUAL PAPER $${p.size} @ ${F.px(p.entry)} · SL ${F.px(p.plan.sl)} · TP1 ${F.px(p.plan.tp[0])}`, 4000); this.render(); }
+        break;
+      }
+      case 'rs-save': if (!t) return; Research.add(t, `Snapshot: ${t.decision} · radar ${r0(t.s?.radar)} · ${STAGES[t.stage] || ''} · ${F.px(t.m?.price)}`); persist(true); toast(`${t.symbol} е в RESEARCH`); this.renderSnap(); this.renderTabs(); break;
+      case 'investigate': if (!t || !t.m) return; handoff(t); persist(true); toast('Handoff JSON свален и копиран — подай го на FOMO Test Agent', 4000); this.render(); break;
+      case 'copy-ca': if (!t) return; try { navigator.clipboard.writeText(t.address).then(() => toast('CA копиран: ' + F.short(t.address)), () => toast(t.address, 6000)); } catch (e) { toast(t.address, 6000); } break;
+      case 'close-pos': Paper.manualClose(el.dataset.id); persist(true); this.render(); toast('Позицията е затворена ръчно (MANUAL CLOSE)'); break;
+      case 'res-filter': S.resFilter = el.dataset.v; this.renderResults(); break;
+      case 'backup': download(`pumpcall_backup_${CFG.mode}_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`, JSON.stringify(backupObj(), null, 1)); break;
+      case 'paper-csv': {
+        const list = S.resFilter === 'all' ? S.paper.closed : S.paper.closed.filter(p => p.how === S.resFilter);
+        download(`pumpcall_paper_${S.resFilter}.csv`, toCSV(list, [['closedAt', p => new Date(p.closedAt).toISOString()], ['openedAt', p => new Date(p.openedAt).toISOString()], ['symbol', p => p.symbol], ['chain', p => p.chain], ['address', p => p.address], ['how', p => p.how], ['entry', p => p.entry], ['slip_in_pct', p => p.slipIn], ['sl', p => p.plan.sl], ['tp1', p => p.plan.tp[0]], ['tp2', p => p.plan.tp[1]], ['tp3', p => p.plan.tp[2]], ['exit', p => p.exitReason], ['tp_hits', p => p.tpHit.filter(Boolean).length], ['r', p => p.rMult], ['pnl_pct', p => p.pnlPct], ['pnl_usd', p => p.pnlUsd], ['mfe', p => p.mfe], ['mae', p => p.mae], ['hold_min', p => p.holdMin], ['stage', p => STAGES[p.snap.stage]], ['radar', p => p.snap.radar], ['ess', p => p.snap.ess], ['copy', p => p.snap.copy], ['risk', p => p.snap.risk], ['edge', p => p.snap.edge], ['lead_s', p => p.snap.leadMs / 1000], ['lock', p => p.lock], ['lock_ok', p => Paper.verify(p)]]), 'text/csv');
+        break;
+      }
+      case 'missed-csv': download('pumpcall_missed.csv', toCSV(S.missed, [['at', r => new Date(r.at).toISOString()], ['symbol', r => r.symbol], ['address', r => r.key], ['type', r => r.type], ['stage', r => STAGES[r.stage]], ['radar', r => r.radar], ['pump', r => r.pump], ['price', r => r.px], ['chase', r => r.chase], ['tp1_pct', r => r.up], ['sl_pct', r => r.down], ['r5', r => r.out.r5], ['r15', r => r.out.r15], ['r60', r => r.out.r60], ['max', r => r.out.max], ['min', r => r.out.min], ['first', r => r.first], ['retest', r => r.retest], ['verdict', r => r.verdict]]), 'text/csv'); break;
+      case 'esdb-csv': download('pumpcall_esdb.csv', toCSV(S.esdb, [['ts', r => new Date(r.ts).toISOString()], ['symbol', r => r.symbol], ['key', r => r.key], ['ess', r => r.ess], ['stage', r => r.stage], ['liq', r => r.liq], ['mc', r => r.mc], ['age_min', r => r.ageMin], ['vol5', r => r.vol5], ['volH1', r => r.volH1], ['bsr5', r => r.bsr5], ['txAccel', r => r.txAccel], ['volAccel', r => r.volAccel], ['nSrc', r => r.nSrc], ['src', r => r.src.join('|')], ['fomoTraders', r => r.fomoTraders], ['risk', r => r.risk], ['chgM5', r => r.chgM5], ['chgH1', r => r.chgH1], ['r5', r => r.out.r5], ['r15', r => r.out.r15], ['r60', r => r.out.r60], ['max60', r => r.out.max60], ['min60', r => r.out.min60], ['done', r => r.done], ['expired', r => !!r.expired]]), 'text/csv'); break;
+      case 'rs-add': {
+        const ch = $('#rsChain').value, ad = $('#rsAddr').value.trim();
+        const ok = ch === 'solana' ? /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(ad) : /^0x[0-9a-fA-F]{40}$/.test(ad);
+        if (!ok) { toast(ch === 'solana' ? 'Невалиден Solana mint адрес' : 'Невалиден EVM адрес (0x + 40 hex)'); return; }
+        const tk = Disc.see(ch, ad, 'manual'); if (!tk) return;
+        const r = Research.add(tk); r.track = true; $('#rsAddr').value = ''; persist(true); this.renderResearch(true); this.renderTabs();
+        toast(CFG.mode === 'sim' ? 'Добавен. В SIM режим реални адреси не получават данни — превключи на LIVE.' : 'Добавен и се следи — данни идват със следващия цикъл', 4000);
+        break;
+      }
+      case 'rs-export': download(`pumpcall_research_${Date.now()}.json`, JSON.stringify({ schema: 'pumpcall.research.v1', exportedAt: new Date().toISOString(), research: S.research }, null, 1)); break;
+      case 'rs-open': this.select(el.dataset.k); break;
+      case 'rs-handoff': { const r = Research.get(el.dataset.id), tk = r && S.tokens.get(r.key); if (tk && tk.m) { handoff(tk); persist(true); this.renderResearch(true); toast('Handoff JSON свален и копиран'); } break; }
+      case 'rs-remove': { const r = Research.get(el.dataset.id); if (r && confirm(`Изтриване на ${r.symbol} от research (с бележките)?`)) { S.research = S.research.filter(x => x.id !== r.id); persist(true); this.renderResearch(true); this.renderTabs(); } break; }
+      case 'rs-note': this.addNote(el.dataset.id); break;
+      case 'err-level': S.errFilter.level = el.dataset.v; this.renderErrors(); break;
+      case 'err-export': download(`pumpcall_errors_${Date.now()}.json`, JSON.stringify({ schema: 'pumpcall.errors.v1', version: VERSION, mode: CFG.mode, exportedAt: new Date().toISOString(), api: S.api, errors: S.errors }, null, 1)); break;
+      case 'err-clear': if (confirm('Изчистване на error log-а? (бъг репортите също)')) { S.errors = []; persist(true); this.renderErrors(); this.renderKpis(); } break;
+      case 'api-test': this.testApis(); break;
+      case 'bug-save': this.saveBug(); break;
+      case 'cfg-save': this.saveConfig(); break;
+      case 'cfg-reset': if (confirm('Връщане на всички настройки по подразбиране? (ключовете остават)')) { const m = CFG.mode; CFG = deepMerge(DEFAULT_CFG, {}); CFG.mode = m; saveCfg(); schedule(); this.renderConfig(); this.render(); toast('Настройките са по подразбиране'); } break;
+      case 'cfg-import': $('#impFile').click(); break;
+      case 'cfg-wipe': this.wipeLive(); break;
+    }
+  }
+});
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+function schedule() {
+  clearInterval(S._timer);
+  const ms = CFG.mode === 'sim' ? CFG.sim.tickMs : CFG.refreshSec * 1000;
+  S._timer = setInterval(() => { if (S.paused) return; if (CFG.mode === 'sim' && document.hidden) return; cycle(); }, ms);
+}
+function boot() {
+  const tk = parseInt(QP.get('tick'), 10); if (CFG.mode === 'sim' && tk >= 100 && tk <= 10000) CFG.sim.tickMs = tk;
+  try { loadState(); } catch (e) { Log.add('ERROR', 'APP', 'LOAD', 'Не успях да заредя запазените данни: ' + e.message, e.stack); }
+  if (CFG.mode === 'sim') { Sim.init(); Log.add('INFO', 'SIM', 'MODE', 'SIM режим — синтетичен пазар, нищо не се записва. За реални данни махни ?mode=sim или смени в CONFIG.'); }
+  else if (location.protocol === 'file:') Log.add('WARN', 'APP', 'FILE_PROTOCOL', 'Отворено от диск (file://). Някои API блокират такива заявки — за LIVE ползвай GitHub Pages или локален сървър (python -m http.server).');
+  UI.init();
+  UI.render();
+  schedule();
+  cycle();
+  window.addEventListener('beforeunload', () => persist(true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) persist(true); });
+}
+boot();
+
+</script>
+</body>
+</html>

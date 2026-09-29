@@ -1,0 +1,137 @@
+PumpCall Radar — Source-Available Noncommercial License
+Version 1.0
+
+Copyright (c) 2026 Dragostin. All rights reserved, except as expressly
+granted below.
+
+
+1. DEFINITIONS
+
+"Software" means PumpCall Radar, including index.html, proxy-worker.js,
+the documentation, and every other file distributed with this license.
+
+"Licensor" means the copyright holder named above.
+
+"You" means the individual or legal entity exercising rights under this
+license.
+
+"Noncommercial Use" means use that is not intended for, or directed
+toward, commercial advantage or monetary compensation. It includes
+personal use, private research, education, evaluation and testing. An
+individual using the Software to inform trading decisions with their own
+funds, for their own account, is Noncommercial Use.
+
+"Commercial Use" means any use that is not Noncommercial Use. It
+includes, without limitation:
+  (a) selling, renting, sublicensing or otherwise charging for the
+      Software or any modified version of it;
+  (b) offering the Software, or functionality based on it, as a hosted,
+      managed or subscription service;
+  (c) using the Software to produce signals, alerts, calls, rankings,
+      reports or analysis that are sold, provided to paying subscribers
+      or members (including paid Telegram, Discord or similar groups),
+      or used to promote paid products or services;
+  (d) including the Software or any part of it in a commercial product;
+  (e) using the Software on behalf of clients or as part of paid
+      services.
+
+
+2. LICENSE GRANT
+
+Subject to the conditions of this license, the Licensor grants You a
+worldwide, non-exclusive, non-transferable, royalty-free license to use,
+copy, modify and run the Software, and to distribute copies and modified
+versions of it, solely for Noncommercial Use.
+
+
+3. CONDITIONS
+
+  (a) Notice. Every copy or modified version You distribute must include
+      this license in full and keep all copyright notices intact.
+  (b) Modifications. Modified versions must state clearly that they have
+      been changed, and by whom.
+  (c) Same terms. Modified versions may be distributed only under this
+      same license.
+  (d) Disclaimers. You may not remove or weaken the "not financial
+      advice" notices shown in the Software's user interface or
+      documentation.
+
+
+4. COMMERCIAL USE
+
+Commercial Use requires a separate written license from the Licensor.
+To request one, contact the Licensor through the contact details on the
+GitHub profile of the repository where the Software is published.
+
+
+5. NAME AND THIRD-PARTY MARKS
+
+This license grants no right to use the name "PumpCall Radar", or any
+logo or branding of the Software, to identify or promote a modified
+version or another product. If You distribute a modified version, You
+must either rename it or mark it clearly as unofficial.
+
+DEX Screener, GeckoTerminal, CoinGecko, Birdeye, FOMO and all other
+third-party names are the property of their respective owners. The
+Software is independent and is not affiliated with, endorsed by or
+sponsored by any of them.
+
+
+6. THIRD-PARTY SERVICES AND DATA
+
+The Software retrieves data from third-party APIs. This license grants
+no rights to that data. You are solely responsible for:
+  (a) obtaining and protecting Your own API keys;
+  (b) complying with each provider's terms of service and rate limits.
+
+
+7. NOT FINANCIAL ADVICE
+
+The Software is a research and paper-trading tool. Its scores, stages,
+decisions, entry limits, take-profit and stop-loss levels, simulated
+results and all other outputs are informational only. They do not
+constitute investment, financial, legal or tax advice, and they are not
+a recommendation to buy or sell any asset.
+
+Crypto assets, and newly launched tokens in particular, are extremely
+volatile and may lose all of their value. Data may be delayed,
+incomplete or wrong. Paper and simulated results do not predict real
+results. You alone are responsible for any trading decision You make.
+
+
+8. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY AND
+NON-INFRINGEMENT.
+
+
+9. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+CONSEQUENTIAL OR EXEMPLARY DAMAGES OF ANY KIND ARISING OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR ITS USE. THIS INCLUDES, WITHOUT
+LIMITATION, TRADING LOSSES, LOST PROFITS, LOSS OF DATA AND DAMAGES CAUSED
+BY THIRD-PARTY DATA OR SERVICES.
+
+
+10. TERMINATION
+
+Your rights under this license end automatically if You breach any of
+its terms.
+
+If it is Your first breach, and You fully cure it within 30 days after
+receiving notice from the Licensor, Your rights are reinstated.
+
+Copies that You lawfully distributed before termination remain licensed
+to their recipients, provided those recipients comply with this license.
+
+
+11. GOVERNING LAW
+
+This license is governed by the laws of the Republic of Bulgaria,
+without regard to its conflict-of-law rules. Nothing in this license
+limits any mandatory rights You may have under the consumer protection
+laws of Your country of residence.
