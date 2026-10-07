@@ -356,7 +356,7 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
   </section>
   <section class="view" id="v-config" role="tabpanel"><div id="config"></div></section>
 </main>
-<footer>FOMO Quant Screen Unified v0.3.1 е инструмент за проучване и paper тестове — не изпълнява реални сделки и не е финансов съвет. Данни: DEX Screener, GeckoTerminal/CoinGecko, Birdeye, FOMO API (по избор), X News API (по избор). Всичко се пази локално в този браузър. © 2026 Dragostin · Source-Available Noncommercial License 1.0 — комерсиална употреба само с разрешение.</footer>
+<footer>FOMO Quant Screen Unified v0.3.2 Reliability е инструмент за проучване и paper тестове — не изпълнява реални сделки и не е финансов съвет. Данни: DEX Screener, GeckoTerminal/CoinGecko, Birdeye, FOMO API (по избор), X News API (по избор). Всичко се пази локално в този браузър. © 2026 Dragostin · Source-Available Noncommercial License 1.0 — комерсиална употреба само с разрешение.</footer>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -364,7 +364,7 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
 /* =====================================================================
    PUMPCALL RADAR v0.1 — core
    ===================================================================== */
-const VERSION = '0.3.1-direction-edge-fix';
+const VERSION = '0.3.2-reliability';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -1178,6 +1178,8 @@ const Paper = {
   },
   open(t, how) {
     const now = Clock.now(), m = t.m; if (!m || !t.f) return null;
+    const prior=[...S.paper.open,...S.paper.closed].find(p=>p.key===t.key && Math.abs(now-(p.openedAt||p.closedAt||0))<3600000);
+    if(prior){ Log.add('WARN','PAPER','DUPLICATE_REJECTED',t.symbol+': same token inside 60m independent-test window',t.key); toast('DUPLICATE REJECTED — not an independent PAPER test'); return null; }
     const plan = t.plan || makePlan(t, now);
     const slipIn = slip(CFG.paper.size, m.liq), entry = m.price * (1 + slipIn / 100);
     const P = { sl: plan.sl, tp: [...plan.tp], mid: plan.mid, entryLow: plan.entryLow, entryHigh: plan.entryHigh, chase: plan.chase, p0: plan.p0, planLock: plan.lock };
@@ -1297,7 +1299,17 @@ const ESDB = {
       const el = (now - r.ts) / 60000, t = S.tokens.get(r.key);
       if (t && t.m && t.m.price > 0) {
         const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
-        for (const cp of [5, 15, 60]) if (el >= cp && r.out['r' + cp] == null) r.out['r' + cp] = (px / r.p0 - 1) * 100;
+        if (!r.cpStatus) r.cpStatus = {};
+        const win={5:2,15:3,60:5};
+        for (const cp of [5,15,60]) {
+          const k='r'+cp, tol=win[cp];
+          if (r.out[k] == null && !r.cpStatus[k] && el >= cp-tol && el <= cp+tol) {
+            r.out[k]=(px/r.p0-1)*100;
+            r.cpStatus[k]={status:'VALIDATED',ts:now,elapsedMin:el,price:px};
+          } else if (r.out[k] == null && !r.cpStatus[k] && el > cp+tol) {
+            r.cpStatus[k]={status:'NOT_VERIFIED',ts:now,elapsedMin:el,reason:'checkpoint window missed'};
+          }
+        }
         if (el >= 60) { r.out.max60 = (r.max / r.p0 - 1) * 100; r.out.min60 = (r.min / r.p0 - 1) * 100; r.done = true; }
       }
       if (!r.done && el > 90) { r.done = true; r.expired = true; }
