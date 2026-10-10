@@ -1272,7 +1272,16 @@ const Missed = {
       const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
       if (r.entryHigh && px <= r.entryHigh) r.retest = true;
       if (!r.first) { if (px >= r.px * (1 + r.up / 100)) r.first = 'UP'; else if (px <= r.px * (1 - r.down / 100)) r.first = 'DOWN'; }
-      for (const cp of [5, 15, 60]) if (el >= cp && r.out['r' + cp] == null) r.out['r' + cp] = (px / r.px - 1) * 100;
+      if(!r.cpStatus) r.cpStatus={};
+      for(const cp of [5,15,30,60]){
+        const k='r'+cp, tol=({5:2,15:3,30:4,60:5})[cp], sourceTs=Number(t.m.updated);
+        if(r.out[k]!=null || r.cpStatus[k]) continue;
+        if(el>cp+tol) {r.cpStatus[k]={status:'NOT_VERIFIED',reason:'missed window',observedAt:now};continue;}
+        if(el>=cp-tol && Number.isFinite(sourceTs) && Math.abs(sourceTs-(r.ts+cp*60000))<=tol*60000){
+          r.out[k]=(px/r.px-1)*100;
+          r.cpStatus[k]={status:'VALIDATED',observedAt:now,sourceTs,price:px};
+        }
+      }
       if (el >= 60) { r.done = true; r.out.max = (r.max / r.px - 1) * 100; r.out.min = (r.min / r.px - 1) * 100; r.verdict = r.first === 'DOWN' ? 'RULE SAVED' : r.first === 'UP' ? 'MISSED WIN' : 'FLAT'; }
     }
   },
