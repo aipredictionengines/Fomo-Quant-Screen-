@@ -364,7 +364,7 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
 /* =====================================================================
    PUMPCALL RADAR v0.1 — core
    ===================================================================== */
-const VERSION = '0.3.1-direction-edge-fix';
+const VERSION = '0.3.2-forward-risk-observation';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -1178,6 +1178,10 @@ const Paper = {
   },
   open(t, how) {
     const now = Clock.now(), m = t.m; if (!m || !t.f) return null;
+    if([...S.paper.open,...S.paper.closed].some(p=>p.key===t.key && Math.abs(now-(p.openedAt||0))<3600000)){
+      Log.add('WARN','PAPER','DUPLICATE_REJECTED',t.symbol+': repeat token/pair within 60m',t.key);
+      return null;
+    }
     const plan = t.plan || makePlan(t, now);
     const slipIn = slip(CFG.paper.size, m.liq), entry = m.price * (1 + slipIn / 100);
     const P = { sl: plan.sl, tp: [...plan.tp], mid: plan.mid, entryLow: plan.entryLow, entryHigh: plan.entryHigh, chase: plan.chase, p0: plan.p0, planLock: plan.lock };
@@ -1297,14 +1301,25 @@ const ESDB = {
       const el = (now - r.ts) / 60000, t = S.tokens.get(r.key);
       if (t && t.m && t.m.price > 0) {
         const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
-        for (const cp of [5, 15, 60]) if (el >= cp && r.out['r' + cp] == null) r.out['r' + cp] = (px / r.p0 - 1) * 100;
-        if (el >= 60) { r.out.max60 = (r.max / r.p0 - 1) * 100; r.out.min60 = (r.min / r.p0 - 1) * 100; r.done = true; }
+        if(!r.cpStatus) r.cpStatus={};
+        const tolerances={5:2,15:3,60:5};
+        for(const cp of [5,15,60]){
+          const k='r'+cp, tol=tolerances[cp];
+          if(r.out[k]!=null || r.cpStatus[k]) continue;
+          if(el>cp+tol) {r.cpStatus[k]={status:'NOT_VERIFIED',observedAt:now,reason:'missed checkpoint window'};continue;}
+          const sourceTs=Number(t.m.updated);
+          if(el>=cp-tol && Number.isFinite(sourceTs) && Math.abs(sourceTs-(r.ts+cp*60000))<=tol*60000){
+            r.out[k]=(px/r.p0-1)*100;
+            r.cpStatus[k]={status:'VALIDATED',observedAt:now,sourceTs,price:px};
+          }
+        }
+        if (el > 65) { r.done = true; r.extremaUnverified = true; }
       }
       if (!r.done && el > 90) { r.done = true; r.expired = true; }
     }
   },
   analysis() {
-    const done = S.esdb.filter(r => r.done && !r.expired && r.out.max60 != null);
+    const done = S.esdb.filter(r => r.done && !r.expired && r.cpStatus?.r60?.status==='VALIDATED');
     const hitP = CFG.esdb.hitPct, susP = CFG.esdb.sustainPct;
     const isHit = r => r.out.max60 >= hitP, isSus = r => r.out.r60 >= susP;
     const rate = (a, fn) => a.length ? a.filter(fn).length / a.length * 100 : null;
