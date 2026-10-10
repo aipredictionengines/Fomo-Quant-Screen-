@@ -1302,8 +1302,8 @@ const ESDB = {
       if (t && t.m && t.m.price > 0) {
         const px = t.m.price; r.max = Math.max(r.max, px); r.min = Math.min(r.min, px);
         if(!r.cpStatus) r.cpStatus={};
-        const tolerances={5:2,15:3,60:5};
-        for(const cp of [5,15,60]){
+        const tolerances={5:2,15:3,30:4,60:5};
+        for(const cp of [5,15,30,60]){
           const k='r'+cp, tol=tolerances[cp];
           if(r.out[k]!=null || r.cpStatus[k]) continue;
           if(el>cp+tol) {r.cpStatus[k]={status:'NOT_VERIFIED',observedAt:now,reason:'missed checkpoint window'};continue;}
