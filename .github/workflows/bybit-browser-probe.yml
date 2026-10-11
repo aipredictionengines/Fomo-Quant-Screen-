@@ -28,8 +28,10 @@ jobs:
             --disable-dev-shm-usage --virtual-time-budget=16000 \
             --dump-dom 'http://127.0.0.1:8123/tests/bybit-browser-probe.html' \
             > /tmp/fomo-cors-result.html 2> /tmp/fomo-cors-stderr.txt || true
-          grep -oE 'PROBE_(OK|FAIL|PENDING)[^<]*' /tmp/fomo-cors-result.html || true
-          if grep -q 'PROBE_OK | Bybit' /tmp/fomo-cors-result.html; then
+          # Read rendered DOM only. Searching the full HTML would falsely match JS source text.
+          rendered=$(sed -n 's/.*<pre id="result">\([^<]*\)<\/pre>.*/\1/p' /tmp/fomo-cors-result.html | head -n 1)
+          echo "Rendered probe result: ${rendered:-NO_RESULT}"
+          if [[ "$rendered" == "PROBE_OK | Bybit"* ]]; then
             echo "Public Bybit browser CORS request PASS from GitHub runner localhost origin"
           else
             echo "::error::Bybit browser request failed/blocked. See probe output. This cannot establish user-region or GitHub Pages origin availability."
