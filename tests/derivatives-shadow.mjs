@@ -39,6 +39,8 @@ const malformedOI = valid(); malformedOI.oi.result = null;
 assert.equal(adapter.normalize('BTCUSDT', malformedOI, NOW).status, 'PARTIAL');
 const oldBucket = valid(); oldBucket.oi.result.list[0].timestamp = String(NOW - 9 * 3600000);
 assert.equal(adapter.normalize('BTCUSDT', oldBucket, NOW).status, 'PARTIAL');
+const noOIUsd = valid(); delete noOIUsd.tickers.result.list[0].openInterestValue;
+assert.equal(adapter.normalize('BTCUSDT', noOIUsd, NOW).status, 'PARTIAL');
 const zeroFunding = valid(); zeroFunding.tickers.result.list[0].fundingRate = '0';
 assert.equal(adapter.normalize('BTCUSDT', zeroFunding, NOW).currentFundingPct, 0);
 assert.throws(() => adapter.normalize('FAKETOKEN', valid(), NOW), /allowlisted/);
