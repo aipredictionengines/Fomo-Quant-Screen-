@@ -53,6 +53,7 @@
       oiAt: null, longAccountPct: null, shortAccountPct: null, ratioAt: null, warnings: warnings,
       source: BASE
     };
+    if (oid === null || oid < 0) warnings.push('OI USD value missing/invalid');
     if (good(oi, now) && oi.result && oi.result.symbol === symbol && oi.result.category === 'linear') {
       var history = list(oi).filter(function (v) {
         return timestamp(v.timestamp, now) && finite(v.openInterest) !== null && finite(v.openInterest) >= 0;
@@ -155,6 +156,12 @@
   }
   async function refresh() {
     if (busy) return;
+    if (document.getElementById('modeBadge') && document.getElementById('modeBadge').classList.contains('sim')) {
+      latest = null; text('bybitShadowStatus', 'DISABLED IN SIM · switch to LIVE');
+      document.getElementById('bybitShadowOutput').replaceChildren();
+      document.getElementById('bybitShadowExport').disabled = true;
+      return;
+    }
     var selector = document.getElementById('bybitShadowSymbol'), button = document.getElementById('bybitShadowRefresh');
     if (!selector || !button) return;
     busy = true; button.disabled = true; latest = null;
