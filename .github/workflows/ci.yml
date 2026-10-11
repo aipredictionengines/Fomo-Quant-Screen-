@@ -11,4 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node tests/planner-smoke.mjs\n      - run: node tests/planner-paper-ready.mjs
+      - run: node tests/planner-smoke.mjs
+      - run: node tests/planner-paper-ready.mjs
