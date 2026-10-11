@@ -53,12 +53,12 @@
       oiAt: null, longAccountPct: null, shortAccountPct: null, ratioAt: null, warnings: warnings,
       source: BASE
     };
-    if (good(oi, now) && oi.result.symbol === symbol && oi.result.category === 'linear') {
+    if (good(oi, now) && oi.result && oi.result.symbol === symbol && oi.result.category === 'linear') {
       var history = list(oi).filter(function (v) {
         return timestamp(v.timestamp, now) && finite(v.openInterest) !== null && finite(v.openInterest) >= 0;
       }).sort(function (a, b) { return Number(b.timestamp) - Number(a.timestamp); });
       if (history.length >= 2 && Number(history[0].timestamp) >= now - 2 * 3600000 &&
-        Number(history[0].timestamp) > Number(history[1].timestamp) && Number(history[0].timestamp) - Number(history[1].timestamp) <= 2 * 3600000 &&
+        Number(history[0].timestamp) > Number(history[1].timestamp) && Number(history[0].timestamp) - Number(history[1].timestamp) <= 1.5 * 3600000 && Number(history[0].timestamp) - Number(history[1].timestamp) >= 0.5 * 3600000 &&
         Number(history[1].openInterest) > 0) {
         result.openInterestChange1hPct = (Number(history[0].openInterest) / Number(history[1].openInterest) - 1) * 100;
         result.oiAt = Number(history[0].timestamp);
