@@ -1328,21 +1328,25 @@ const ESDB = {
     }
   },
   analysis() {
-    const done = S.esdb.filter(r => r.done && !r.expired && r.cpStatus?.r60?.status==='VALIDATED');
+    const done = S.esdb.filter(r => r.done && !r.expired && r.cpStatus?.r60?.status==='VALIDATED' && Number.isFinite(r.out?.r60));
     const hitP = CFG.esdb.hitPct, susP = CFG.esdb.sustainPct;
-    const isHit = r => r.out.max60 >= hitP, isSus = r => r.out.r60 >= susP;
+    const isSus = r => r.out.r60 >= susP;
     const rate = (a, fn) => a.length ? a.filter(fn).length / a.length * 100 : null;
+    // Browser-sampled highs are not verified maxima; missing proof means N/A, never MISS.
+    const verifiedMax = r => r.cpStatus?.max60?.status === 'VALIDATED' && Number.isFinite(r.out?.max60);
+    const hitRate = a => rate(a.filter(verifiedMax), r => r.out.max60 >= hitP);
+    const avgMax = a => { const v = a.filter(verifiedMax); return v.length ? v.reduce((x, r) => x + r.out.max60, 0) / v.length : null; };
     const avg = a => a.length ? a.reduce((x, r) => x + r.out.r60, 0) / a.length : null;
     const feats = [['ess', 'Early Signal Score'], ['txAccel', 'Tx acceleration'], ['volAccel', 'Volume acceleration'], ['bsr5', 'Buy/Sell 5m'], ['vol5', 'Volume 5m'], ['liq', 'Liquidity'], ['ageMin', 'Pair age (min)'], ['chgH1', 'Δ1h at detection'], ['nSrc', 'Sources count'], ['fomoTraders', 'FOMO traders 15m'], ['risk', 'Token risk']];
     const rows = feats.map(([k, label]) => {
       const v = done.filter(r => r[k] != null && isFinite(r[k])); if (v.length < 6) return { k, label, n: v.length };
       const sorted = v.map(r => r[k]).sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)];
       const hi = v.filter(r => r[k] > med), lo = v.filter(r => r[k] <= med);
-      const hH = rate(hi, isHit), hL = rate(lo, isHit);
+      const hH = hitRate(hi), hL = hitRate(lo);
       return { k, label, n: v.length, med, hitHi: hH, hitLo: hL, susHi: rate(hi, isSus), susLo: rate(lo, isSus), r60Hi: avg(hi), r60Lo: avg(lo), lift: hH != null && hL != null ? hH - hL : null, nHi: hi.length, nLo: lo.length };
     }).sort((a, b) => Math.abs(b.lift ?? -1) - Math.abs(a.lift ?? -1));
-    const buckets = [[0, 40], [40, 60], [60, 75], [75, 101]].map(([a, b]) => { const arr = done.filter(r => r.ess >= a && r.ess < b); return { label: `${a}–${Math.min(b, 100)}`, n: arr.length, hit: rate(arr, isHit), sus: rate(arr, isSus), r60: avg(arr), max60: arr.length ? arr.reduce((x, r) => x + r.out.max60, 0) / arr.length : null }; });
-    return { n: done.length, total: S.esdb.length, pending: S.esdb.filter(r => !r.done).length, base: { hit: rate(done, isHit), sus: rate(done, isSus), r60: avg(done) }, rows, buckets };
+    const buckets = [[0, 40], [40, 60], [60, 75], [75, 101]].map(([a, b]) => { const arr = done.filter(r => r.ess >= a && r.ess < b); return { label: `${a}–${Math.min(b, 100)}`, n: arr.length, hit: hitRate(arr), sus: rate(arr, isSus), r60: avg(arr), max60: avgMax(arr) }; });
+    return { n: done.length, total: S.esdb.length, pending: S.esdb.filter(r => !r.done).length, base: { hit: hitRate(done), sus: rate(done, isSus), r60: avg(done) }, hitVerified: done.filter(verifiedMax).length, rows, buckets };
   }
 };
 
@@ -1936,10 +1940,10 @@ Object.assign(UI, {
     const a = ESDB.analysis(), H = CFG.esdb.hitPct, Su = CFG.esdb.sustainPct;
     const warn = a.n < 50 ? `<div class="callout" style="margin:8px 10px">Извадка ${a.n} завършени сигнала. Под 50–100 изводите са шум — гледай тенденцията, не решавай още.</div>` : '';
     const brow = a.buckets.map(b => `<tr><td class="l">ESS ${b.label}</td><td>${b.n}</td><td class="${b.hit != null && a.base.hit != null && b.hit > a.base.hit ? 'up' : ''}">${b.hit != null ? F.n(b.hit, 0) + '%' : '—'}</td><td>${b.sus != null ? F.n(b.sus, 0) + '%' : '—'}</td>${pc(b.r60)}${pc(b.max60)}</tr>`);
-    const lrow = a.rows.map(r => r.lift == null ? `<tr><td class="l">${r.label}</td><td>${r.n}</td><td colspan="7" class="l mut">нужни ≥ 6 завършени сигнала</td></tr>` : `<tr><td class="l">${r.label}</td><td>${r.n}</td><td>${Math.abs(r.med) >= 1000 ? F.usd(r.med) : F.n(r.med, 2)}</td><td>${F.n(r.hitHi, 0)}% <small class="mut">n${r.nHi}</small></td><td>${F.n(r.hitLo, 0)}% <small class="mut">n${r.nLo}</small></td><td class="${r.lift > 5 ? 'up' : r.lift < -5 ? 'dn' : 'mut'}"><b>${r.lift > 0 ? '+' : ''}${F.n(r.lift, 0)}pp</b></td><td>${F.n(r.susHi, 0)}% / ${F.n(r.susLo, 0)}%</td>${pc(r.r60Hi)}${pc(r.r60Lo)}</tr>`);
-    const recs = S.esdb.slice(0, 250).map(r => `<tr data-key="${esc(r.key)}" data-go="1"><td>${F.dt(r.ts)}</td><td class="l tok"><b>${esc(r.symbol)}</b></td><td class="${sc(r.ess)}">${r0(r.ess)}</td><td class="l"><span class="stg s${r.stage}">${STAGE_SHORT[r.stage]}</span></td><td>${F.usd(r.liq)}</td><td>${F.age(r.ageMin)}</td><td>${F.x(r.bsr5, 1)}</td><td>${F.x(r.txAccel, 1)}</td><td>${F.x(r.volAccel, 1)}</td><td>${r.nSrc}</td><td>${r.fomoTraders || 0}</td>${pc(r.chgH1)}${pc(r.out.r5)}${pc(r.out.r15)}${pc(r.out.r60)}${pc(r.out.max60)}${pc(r.out.min60)}<td class="l ${r.expired ? 'mut' : r.done ? (r.out.max60 >= H ? 'up' : '') : 'cy'}">${r.expired ? 'NO DATA' : r.done ? (r.out.max60 >= H ? 'HIT' : 'miss') : 'TRACKING'}</td></tr>`);
-    $('#esdb').innerHTML = panel('EARLY SIGNAL DATABASE', `${a.total} signals · ${a.n} resolved · ${a.pending} tracking`,
-      `<div class="tabnote">Всеки нов токен (liq ≥ ${F.usd(CFG.filters.minLiqDiscovery)}) се записва с ранните си признаци в момента на откриване, после се следи +5 / +15 / +60 мин. <b>HIT</b> = максимум ≥ +${H}% в рамките на 60 мин; <b>SUSTAIN</b> = още ≥ +${Su}% на 60-ата минута. <b>LIFT</b> = hit rate над медианата минус hit rate под медианата — показва кои ранни признаци наистина предхождат устойчив pump и кои са шум.</div>${warn}`
+    const lrow = a.rows.map(r => r.lift == null ? `<tr><td class="l">${r.label}</td><td>${r.n}</td><td colspan="7" class="l mut">HIT/MAX без валидирани екстремуми (или малка извадка)</td></tr>` : `<tr><td class="l">${r.label}</td><td>${r.n}</td><td>${Math.abs(r.med) >= 1000 ? F.usd(r.med) : F.n(r.med, 2)}</td><td>${F.n(r.hitHi, 0)}% <small class="mut">n${r.nHi}</small></td><td>${F.n(r.hitLo, 0)}% <small class="mut">n${r.nLo}</small></td><td class="${r.lift > 5 ? 'up' : r.lift < -5 ? 'dn' : 'mut'}"><b>${r.lift > 0 ? '+' : ''}${F.n(r.lift, 0)}pp</b></td><td>${F.n(r.susHi, 0)}% / ${F.n(r.susLo, 0)}%</td>${pc(r.r60Hi)}${pc(r.r60Lo)}</tr>`);
+    const recs = S.esdb.slice(0, 250).map(r => `<tr data-key="${esc(r.key)}" data-go="1"><td>${F.dt(r.ts)}</td><td class="l tok"><b>${esc(r.symbol)}</b></td><td class="${sc(r.ess)}">${r0(r.ess)}</td><td class="l"><span class="stg s${r.stage}">${STAGE_SHORT[r.stage]}</span></td><td>${F.usd(r.liq)}</td><td>${F.age(r.ageMin)}</td><td>${F.x(r.bsr5, 1)}</td><td>${F.x(r.txAccel, 1)}</td><td>${F.x(r.volAccel, 1)}</td><td>${r.nSrc}</td><td>${r.fomoTraders || 0}</td>${pc(r.chgH1)}${pc(r.out.r5)}${pc(r.out.r15)}${pc(r.out.r60)}${pc(r.out.max60)}${pc(r.out.min60)}<td class="l ${r.expired ? 'mut' : !r.done ? 'cy' : (r.cpStatus?.max60?.status==='VALIDATED' && Number.isFinite(r.out?.max60) && r.out.max60 >= H ? 'up' : 'mut')}">${r.expired ? 'NO DATA' : !r.done ? 'TRACKING' : (r.cpStatus?.max60?.status==='VALIDATED' && Number.isFinite(r.out?.max60) ? (r.out.max60 >= H ? 'HIT' : 'MISS') : r.cpStatus?.r60?.status==='VALIDATED' ? '60M VERIFIED · HIT N/A' : 'NOT VERIFIED')}</td></tr>`);
+    $('#esdb').innerHTML = panel('EARLY SIGNAL DATABASE', `${a.total} signals · ${a.n} verified 60m · ${a.hitVerified} verified maxima · ${a.pending} tracking`,
+      `<div class="tabnote">Всеки нов токен (liq ≥ ${F.usd(CFG.filters.minLiqDiscovery)}) се записва с ранните си признаци в момента на откриване, после се следи +5 / +15 / +60 мин. <b>HIT</b> = максимум ≥ +${H}% за 60 мин само при валидирани екстремуми (иначе N/A); <b>SUSTAIN</b> = ≥ +${Su}% на 60-ата минута само с VALIDATED checkpoint. <b>LIFT</b> = hit rate над медианата минус hit rate под медианата — показва кои ранни признаци наистина предхождат устойчив pump и кои са шум.</div>${warn}`
       + statGrid([[a.total, 'SIGNALS'], [a.n, 'RESOLVED 60m'], [a.pending, 'TRACKING', 'cy'], [a.base.hit != null ? F.n(a.base.hit, 0) + '%' : '—', `BASE HIT (≥+${H}%)`, 'up'], [a.base.sus != null ? F.n(a.base.sus, 0) + '%' : '—', `SUSTAIN (≥+${Su}% @60m)`], [F.pct(a.base.r60), 'AVG +60m', cls(a.base.r60)]])
       + `<div class="btns" style="padding:8px 10px"><button class="btn sm" data-act="esdb-csv">EXPORT CSV</button></div>`)
       + `<div class="cols2" style="margin-top:10px">` + panel('BY EARLY SIGNAL SCORE', 'калибрация на ESS', `<div class="scroll">${tbl([['BUCKET', 'l'], ['N'], ['HIT'], ['SUSTAIN'], ['AVG +60m'], ['AVG MAX']], brow)}</div>`)
