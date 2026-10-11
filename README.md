@@ -218,3 +218,27 @@ discovery → normalize → features → scores → stage → locked plan → de
 - ✅ Модифицирани версии могат да се споделят некомерсиално, но под същия лиценз, с отбелязани промени и с друго име или ясна маркировка "unofficial".
 - ❌ **Комерсиална употреба само с писмено разрешение.** Такава е продажба, SaaS/хостнат сървис, платени сигнали или платени групи (Telegram/Discord), вграждане в платен продукт или работа за клиенти.
 - ⚠️ Без гаранции и без отговорност за загуби. **Не е финансов съвет.** Потребителят сам отговаря за API ключовете си и за условията на всеки доставчик на данни.
+
+
+## Position Planner v0.3 integration (RC)
+
+Architecture is intentionally separated:
+
+- **Quant Screen = signal intelligence**
+- **Analyst Agent = deeper validation**
+- **Position Planner = execution/risk translation**
+- **Calculator = internal Position Planner module**
+
+The LIVE SIGNALS right sidebar now includes a paper-only Position Planner. It uses the selected Quant token, accepts an Analyst Agent JSON for deeper validation, calculates a configurable paper position (default $10), enforces a max modeled net-loss budget (default $1), accounts for modeled slippage/fees/execution buffer, produces a dynamic TP ladder with a 24H runner, and locks eligible snapshots with SHA-256.
+
+Risk Gate is not bypassable inside the Planner: WATCH/REJECT can be previewed but only ALLOW PAPER can lock a Position Planner snapshot. This integration does **not** connect a wallet and does **not** execute live trades.
+
+### RC gate before stable use in PAPER 50
+
+1. GitHub CI smoke PASS.
+2. GitHub Pages smoke test on desktop and mobile.
+3. Import real Quant/Analyst JSON samples and verify contract/direction matching.
+4. Verify $10 / $1 risk calculations across low/high liquidity cases.
+5. Verify REJECT/WATCH cannot lock snapshots.
+6. Verify snapshot export and persistence after reload.
+7. Only after these checks promote the integration from RC to stable PAPER use.
