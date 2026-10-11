@@ -19,7 +19,7 @@ assert.equal(base.status, 'VERIFIED');
 assert.equal(base.markPrice, 90000.5);
 assert.equal(base.currentFundingPct, -0.005);
 assert.equal(base.latestSettledFundingPct, 0.01);
-assert.equal(base.openInterestChange1hPct, 10);
+assert.ok(Math.abs(base.openInterestChange1hPct - 10) < 1e-9);
 assert.equal(base.longAccountPct, 54);
 assert.equal(base.shortAccountPct, 46);
 assert.equal(base.openInterestUsd, 200000000);
