@@ -1,0 +1,14 @@
+name: FOMO Reliability Regression CI
+on:
+  pull_request:
+  push:
+    branches: [fix/v0.3.2-forward-risk-observation, main]
+jobs:
+  esdb-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/esdb-integrity.mjs
