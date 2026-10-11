@@ -50,5 +50,5 @@ assert.equal(a.base.sus,null);
 const notNum=entry('x1',{out:{r60:NaN,max60:99}});
 assert.equal(evaluate([notNum]).n,0,'invalid r60 excluded');
 assert.ok(html.includes('60M VERIFIED · HIT N/A'),'UI never mislabels unverified max as MISS');
-assert.equal((html.match(/<\/script>/g)||[]).length,1);
+assert.equal((html.match(/<script(?![^>]*src=)[^>]*>/gi)||[]).length,1,'one inline app script');
 console.log('ESDB integrity regression PASS');
