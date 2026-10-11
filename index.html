@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FOMO Quant Screen v0.3.1 — Direction & Edge Fix</title>
+<title>FOMO Quant Screen v0.3.3 RC — Position Planner Integration</title>
 <meta name="description" content="PumpCall Radar: early pump detection, entry / chase limits, TP/SL, paper tracking, Early Signal Database. DEX Screener · GeckoTerminal · CoinGecko · Birdeye · FOMO.">
 <meta name="theme-color" content="#04060a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2304060a' stroke='%2343d9ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%231f5a73' stroke-width='1.5'/%3E%3Cpath d='M16 16 L28 10' stroke='%2343d9ff' stroke-width='2'/%3E%3Ccircle cx='22' cy='20' r='2.5' fill='%2335f08d'/%3E%3C/svg%3E">
@@ -243,11 +243,21 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
 .snap .kv dd{white-space:normal;overflow:visible;word-break:break-word}
 .err-row details summary{cursor:pointer;color:var(--mut)}
 
+
+/* ---------- Position Planner sidebar ---------- */
+.pp-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.pp-grid label{display:flex;flex-direction:column;gap:3px;color:var(--mut);font-size:10px}.pp-grid input{width:100%}
+.pp-status{padding:6px 8px;border-left:3px solid var(--line2);background:#09101a;margin-bottom:7px}
+.pp-status.ok{border-color:var(--green);background:#091711}.pp-status.watch{border-color:var(--amber);background:#181207}.pp-status.bad{border-color:var(--red);background:#1a0910}
+.pp-money{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-variant-numeric:tabular-nums}.pp-money span:nth-child(odd){color:var(--mut)}.pp-money b{text-align:right}
+.pp-targets{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:6px}.pp-targets th,.pp-targets td{padding:3px 4px;border-bottom:1px solid #121a26;text-align:right}.pp-targets th:first-child,.pp-targets td:first-child{text-align:left}
+.pp-lock{word-break:break-all;color:var(--mut);font-size:9.5px;margin-top:6px}
+@media(max-width:420px){.pp-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="brand">FOMO QUANT SCREEN<small>v0.3.1 · Unified Radar · PAPER 50</small></div>
+  <div class="brand">FOMO QUANT SCREEN<small>v0.3.3 RC · Unified Radar · PAPER 50</small></div>
   <span id="modeBadge" class="mode"></span>
   <span class="clock" id="clock">--:--:--</span>
   <div class="lights" id="lights"></div>
@@ -317,6 +327,30 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
           <div class="ph"><i>◆</i> PUMPCALL SNAPSHOT <span class="r" id="snapInfo"></span></div>
           <div id="snap" class="snap"><div class="empty">Избери токен от таблицата или радара.</div></div>
         </div>
+        <div class="panel" id="positionPlannerPanel">
+          <div class="ph"><i>◆</i> POSITION PLANNER <span class="r">v0.3 · PAPER ONLY</span></div>
+          <div class="pb">
+            <div id="ppStatus" class="pp-status">Избери token. Planner = execution/risk translation.</div>
+            <div class="pp-grid">
+              <label>Paper capital ($)<input id="ppCapital" type="number" min="1" step="0.01" value="10"></label>
+              <label>Max net loss ($)<input id="ppRisk" type="number" min="0.10" step="0.01" value="1"></label>
+              <label>Execution buffer ($)<input id="ppBuffer" type="number" min="0" step="0.01" value="0.05"></label>
+              <label>Max hold<input type="text" value="24H" readonly></label>
+            </div>
+            <div class="btns" style="margin-top:7px">
+              <button class="btn vi" data-act="pp-analyst">IMPORT ANALYST JSON</button>
+              <button class="btn" data-act="pp-clear-analyst">CLEAR</button>
+              <input id="ppAnalystFile" type="file" accept="application/json,.json" hidden>
+            </div>
+            <div id="ppAnalystState" class="mini" style="margin-top:5px">Analyst validation: not loaded</div>
+            <div class="btns" style="margin-top:7px">
+              <button class="btn go" data-act="pp-build">BUILD PAPER PLAN</button>
+              <button class="btn vi" data-act="pp-lock" disabled>LOCK SNAPSHOT</button>
+              <button class="btn" data-act="pp-export" disabled>EXPORT JSON</button>
+            </div>
+          </div>
+          <div id="ppOut" class="sect"><div class="empty">Signal → Analyst validation → Position Planner → Calculator → Risk Gate → Paper Snapshot.</div></div>
+        </div>
       </div>
     </div>
   </section>
@@ -356,7 +390,7 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
   </section>
   <section class="view" id="v-config" role="tabpanel"><div id="config"></div></section>
 </main>
-<footer>FOMO Quant Screen Unified v0.3.1 е инструмент за проучване и paper тестове — не изпълнява реални сделки и не е финансов съвет. Данни: DEX Screener, GeckoTerminal/CoinGecko, Birdeye, FOMO API (по избор), X News API (по избор). Всичко се пази локално в този браузър. © 2026 Dragostin · Source-Available Noncommercial License 1.0 — комерсиална употреба само с разрешение.</footer>
+<footer>FOMO Quant Screen Unified v0.3.3 RC е инструмент за проучване и paper тестове — не изпълнява реални сделки и не е финансов съвет. Данни: DEX Screener, GeckoTerminal/CoinGecko, Birdeye, FOMO API (по избор), X News API (по избор). Всичко се пази локално в този браузър. © 2026 Dragostin · Source-Available Noncommercial License 1.0 — комерсиална употреба само с разрешение.</footer>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -364,7 +398,7 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
 /* =====================================================================
    PUMPCALL RADAR v0.1 — core
    ===================================================================== */
-const VERSION = '0.3.2-forward-risk-observation';
+const VERSION = '0.3.3-position-planner-integration-rc1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -531,6 +565,7 @@ let SESSION_KEYS = { xBearer:'', gemini:'' };
    ===================================================================== */
 const S = {
   tokens: new Map(), sel: null, paper: { open: [], closed: [] }, missed: [], esdb: [], research: [], events: [], errors: [],
+  planner: { analyst:null, analystExtract:null, analystKey:null, plan:null, latestSnapshot:null, journal:[] },
   api: {}, cgSyms: new Set(), ignore: new Map(), fomo: { traders: [], cursor: 0, resolved: {} },
   sort: { col: 'radar', dir: -1 }, filter: { q: '', dec: 'ALL' }, errFilter: { level: 'ALL', source: 'ALL' }, resFilter: 'auto',
   tab: 'live', paused: false, scanning: false, lastScan: 0, lastScanMs: 0, nextAt: 0, cycles: 0, lastPersist: 0
@@ -1411,13 +1446,13 @@ function tokenMeta() {
 function persist(force) {
   if (CFG.mode === 'sim' || !Store.ready) return;
   const now = Date.now(); if (!force && now - S.lastPersist < 5000) return; S.lastPersist = now;
-  Store.save({ paper: S.paper, missed: S.missed.slice(0, 1500), esdb: S.esdb.slice(0, CFG.esdb.cap), research: S.research, errors: S.errors.slice(0, 1000), events: S.events.slice(0, 200), tokens: tokenMeta() });
+  Store.save({ paper: S.paper, plannerJournal:S.planner.journal.slice(-500), missed: S.missed.slice(0, 1500), esdb: S.esdb.slice(0, CFG.esdb.cap), research: S.research, errors: S.errors.slice(0, 1000), events: S.events.slice(0, 200), tokens: tokenMeta() });
 }
 async function loadState() {
   if (CFG.mode === 'sim') return;
   await Store.migrate();
-  const d = await Store.getMany(['paper', 'missed', 'esdb', 'research', 'errors', 'events', 'tokens']);
-  S.paper = d.paper || { open: [], closed: [] }; S.missed = d.missed || []; S.esdb = d.esdb || [];
+  const d = await Store.getMany(['paper', 'plannerJournal', 'missed', 'esdb', 'research', 'errors', 'events', 'tokens']);
+  S.paper = d.paper || { open: [], closed: [] }; S.planner.journal=d.plannerJournal||[]; S.missed = d.missed || []; S.esdb = d.esdb || [];
   S.research = d.research || []; S.errors = [...S.errors, ...(d.errors || [])].slice(0, 1500); S.events = d.events || [];
   for (const m of d.tokens || []) {
     if (!m || !m.key) continue;
@@ -1427,7 +1462,24 @@ async function loadState() {
   }
   for (const r of S.research) if (r.track && !S.tokens.has(r.key)) S.tokens.set(r.key, newToken(r.key, r.chain, r.address));
 }
-function backupObj() { return { schema: 'pumpcall.backup.v1', exportedAt: new Date().toISOString(), version: VERSION, mode: CFG.mode, cfg: CFG, paper: S.paper, missed: S.missed, esdb: S.esdb, research: S.research, errors: S.errors, events: S.events, tokens: tokenMeta() }; }
+function backupObj() { return { schema: 'pumpcall.backup.v1', exportedAt: new Date().toISOString(), version: VERSION, mode: CFG.mode, cfg: CFG, paper: S.paper, plannerJournal:S.planner.journal, missed: S.missed, esdb: S.esdb, research: S.research, errors: S.errors, events: S.events, tokens: tokenMeta() }; }
+
+
+/* POSITION PLANNER v0.3 — execution/risk translation only */
+const Planner={
+  flat(o,a){a=a||[];if(!o||typeof o!=='object')return a;Object.entries(o).forEach(function(e){var k=e[0],v=e[1];if(v&&typeof v==='object'&&!Array.isArray(v))Planner.flat(v,a);else a.push([k.toLowerCase(),v]);});return a;},
+  pick(o,n){var a=this.flat(o);for(var i=0;i<n.length;i++){var k=n[i].toLowerCase(),h=a.find(function(x){return x[0]===k&&x[1]!=null&&x[1]!=='';});if(h)return h[1];}return null;},
+  pct(v){if(v==null)return null;if(typeof v==='string')v=parseFloat(v.replace('%',''));v=Number(v);return isFinite(v)?(v>0&&v<=1?v*100:v):null;},
+  extract(j){return{contract:this.pick(j,['contract','token_address','tokenAddress','mint','address']),direction:this.pick(j,['direction','side','bias']),confidence:this.pct(this.pick(j,['confidence','confidence_pct','confidenceScore'])),decision:this.pick(j,['decision','final_decision','action','paper_eligible'])};},
+  async importAnalyst(file){try{var j=JSON.parse(await file.text()),x=this.extract(j),t=S.sel&&S.tokens.get(S.sel);if(!t){toast('Първо избери token');return;}if(x.contract&&String(x.contract).toLowerCase()!==String(t.address).toLowerCase()){toast('Analyst JSON contract не съвпада с token',5000);return;}S.planner.analyst=j;S.planner.analystExtract=x;S.planner.analystKey=t.key;S.planner.plan=null;Log.add('INFO','PLANNER','ANALYST_IMPORT',t.symbol+' analyst JSON',t.key);this.render();}catch(e){toast('Невалиден Analyst JSON: '+e.message,5000);}},
+  gate(t){var r=[],ax=S.planner.analystKey===t.key?S.planner.analystExtract:null,st='ALLOW PAPER';function rej(x){st='REJECT';r.push(x);}function wat(x){if(st!=='REJECT')st='WATCH';r.push(x);}if(!t.m||!t.s||!t.f||!(t.m.price>0))rej('missing market data');if(t.decision==='REJECT'||t.decision==='TOO LATE')rej('Quant '+t.decision);else if(t.decision!=='ALLOW PAPER')wat('Quant not ALLOW PAPER');if(t.entryState==='CHASED')rej('DO NOT CHASE');if(t.m.liq<CFG.gates.minLiq)rej('liquidity below gate');if(t.s.copy<CFG.gates.minCopy)rej('copyability below gate');var sg=t.securityGate||securityGateOf(t);if(sg.status==='FAIL')rej('security FAIL');else if(sg.status!=='PASS')wat('security not PASS');if(!ax)wat('Analyst JSON missing');else{var d=String(ax.decision||'').toUpperCase(),dir=String(ax.direction||'').toUpperCase(),qd=qsDirection(t);if(/REJECT|BLOCK|INVALID|NO.?TRADE/.test(d))rej('Analyst reject');if(dir&&qd&&qd!=='UNKNOWN'&&!dir.includes(qd)&&!(qd==='LONG'&&dir.includes('BUY')))rej('direction conflict');if(!/ALLOW|PAPER|LONG|BUY|PASS/.test(d+' '+dir))wat('Analyst approval not explicit');}return{status:st,reasons:r,analyst:ax};},
+  build(){var t=S.sel&&S.tokens.get(S.sel);if(!t||!t.m){toast('Избери token');return;}var cap=Number($('#ppCapital').value),risk=Number($('#ppRisk').value),buf=Number($('#ppBuffer').value);if(!(cap>0&&risk>0&&risk<cap&&buf>=0)){toast('Провери capital / risk');return;}var g=this.gate(t),sp=Math.max(0,slip(cap,t.m.liq)),fee=cap*(Number(CFG.paper.feePct)||0)/100*2,cost=cap*sp/100*2+fee+buf,avail=Math.max(0,risk-cost),slp=avail/cap*100,struct=t.plan&&t.plan.slPct?t.plan.slPct:clamp((t.f.volUnit||3)*CFG.plan.slMult,CFG.plan.slMin,CFG.plan.slMax);slp=Math.max(0,Math.min(9.5,slp));if(avail/cap*100<Math.min(struct,6)){g.status='REJECT';g.reasons.push('risk budget too small for structural stop');}var fill=t.m.price*(1+sp/100),qty=cap/fill,ax=g.analyst,q=[t.s.radar,t.s.copy,100-t.s.risk,t.s.ess,ax&&ax.confidence].filter(isFinite),qual=q.length?q.reduce(function(a,b){return a+b;},0)/q.length:t.s.radar,tp=qual>=80?[20,40,70]:qual>=65?[15,30,50]:[12,22,35],frac=[.2,.3,.3];var lv=tp.map(function(x,i){return{name:'TP'+(i+1),pct:x,price:fill*(1+x/100),exitFrac:frac[i],fullUsd:cap*x/100,partialUsd:cap*frac[i]*x/100};});S.planner.plan={schema:'fomo.position-planner.v0.3',createdAt:new Date().toISOString(),decision:g.status,gate:g,token:{key:t.key,chain:t.chain,address:t.address,symbol:t.symbol},capitalUsd:cap,maxNetLossUsd:risk,maxHoldHours:24,qualityScore:Math.round(qual),execution:{marketPrice:t.m.price,fill:fill,qty:qty,slipPct:sp,feesUsd:fee,bufferUsd:buf,costUsd:cost},risk:{structuralStopPct:struct,stopPct:slp,stopPrice:fill*(1-slp/100),netLossUsd:cap*slp/100+cost},targets:{levels:lv,runnerFrac:.2},quant:{decision:t.decision,direction:qsDirection(t),radar:t.s.radar,copy:t.s.copy,risk:t.s.risk},analyst:ax};this.render();},
+  async hash(o){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(o)));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');},
+  async lock(){var t=S.sel&&S.tokens.get(S.sel),p=S.planner.plan;if(!t||!p||p.token.key!==t.key){toast('Build plan first');return;}if(p.decision!=='ALLOW PAPER'){toast('Risk Gate veto');return;}var o={schema:'fomo.position-snapshot.v0.3',testId:'FOMO-PP-'+String(S.planner.journal.length+1).padStart(3,'0'),lockedAt:new Date().toISOString(),version:VERSION,quant:{token:{key:t.key,chain:t.chain,address:t.address,symbol:t.symbol},market:t.m,features:t.f,scores:t.s,decision:t.decision,reasons:t.reasons},analyst:S.planner.analystKey===t.key?S.planner.analyst:null,positionPlan:p},h=await this.hash(o),rec={original:o,sha256:h,followUps:[]};S.planner.journal.push(rec);S.planner.latestSnapshot=rec;persist(true);this.render();toast(o.testId+' locked');},
+  exportLatest(){var r=S.planner.latestSnapshot;if(!r){toast('Няма snapshot');return;}download(r.original.testId+'.json',JSON.stringify(r,null,2));},
+  clear(){S.planner.analyst=null;S.planner.analystExtract=null;S.planner.analystKey=null;S.planner.plan=null;var f=$('#ppAnalystFile');if(f)f.value='';this.render();},
+  render(){var st=$('#ppStatus'),out=$('#ppOut'),as=$('#ppAnalystState');if(!st||!out||!as)return;var t=S.sel&&S.tokens.get(S.sel),ax=S.planner.analystKey===S.sel?S.planner.analystExtract:null;as.textContent=ax?'Analyst: '+(ax.decision||'—')+' · '+(ax.direction||'—')+' · '+(ax.confidence!=null?Math.round(ax.confidence)+'%':'—'):'Analyst validation: not loaded';if(!t||!t.m||!t.s||!t.f){st.className='pp-status';st.textContent='Избери token с market data.';out.innerHTML='<div class="empty">Planner чака Quant signal.</div>';return;}var g=this.gate(t),cl=g.status==='ALLOW PAPER'?'ok':g.status==='WATCH'?'watch':'bad';st.className='pp-status '+cl;st.textContent=g.status+' · '+(t.symbol||'?')+' · '+(g.reasons.join(' · ')||'gates passed');var p=S.planner.plan&&S.planner.plan.token.key===S.sel?S.planner.plan:null;if(!p){out.innerHTML='<div class="mini">Capital $'+($('#ppCapital').value||'10')+' · max net loss $'+($('#ppRisk').value||'1')+' · 24H. Import Analyst JSON, then BUILD PAPER PLAN.</div>';$('#positionPlannerPanel [data-act="pp-lock"]').disabled=true;$('#positionPlannerPanel [data-act="pp-export"]').disabled=!S.planner.latestSnapshot;return;}var h='<h3>POSITION + CALCULATOR</h3><div class="pp-money"><span>Capital</span><b>$'+F.n(p.capitalUsd,2)+'</b><span>Fill</span><b>'+F.px(p.execution.fill)+'</b><span>Quantity</span><b>'+F.n(p.execution.qty,4)+'</b><span>Slippage in/out</span><b>'+F.n(p.execution.slipPct,2)+'% / '+F.n(p.execution.slipPct,2)+'%</b><span>Fees + buffer</span><b>$'+F.n(p.execution.feesUsd+p.execution.bufferUsd,2)+'</b><span>STOP</span><b class="dn">−'+F.n(p.risk.stopPct,2)+'% · '+F.px(p.risk.stopPrice)+'</b><span>Modeled net loss</span><b>−$'+F.n(p.risk.netLossUsd,2)+'</b></div><table class="pp-targets"><thead><tr><th>TP</th><th>Price</th><th>Move</th><th>Exit</th><th>Full $</th><th>Partial $</th></tr></thead><tbody>';p.targets.levels.forEach(function(x){h+='<tr><td class="up">'+x.name+'</td><td>'+F.px(x.price)+'</td><td class="up">+'+F.n(x.pct,0)+'%</td><td>'+Math.round(x.exitFrac*100)+'%</td><td class="up">+$'+F.n(x.fullUsd,2)+'</td><td class="up">+$'+F.n(x.partialUsd,2)+'</td></tr>';});h+='</tbody></table><div class="mini">Runner 20% · max 24H · quality '+p.qualityScore+'/100 · structural stop '+F.n(p.risk.structuralStopPct,1)+'%</div>';if(p.gate.reasons.length)h+='<div class="reasons">'+p.gate.reasons.map(esc).join(' · ')+'</div>';if(S.planner.latestSnapshot&&S.planner.latestSnapshot.original.positionPlan.token.key===t.key)h+='<div class="pp-lock">LOCKED '+esc(S.planner.latestSnapshot.original.testId)+' · SHA-256 '+esc(S.planner.latestSnapshot.sha256)+'</div>';out.innerHTML=h;$('#positionPlannerPanel [data-act="pp-lock"]').disabled=p.decision!=='ALLOW PAPER';$('#positionPlannerPanel [data-act="pp-export"]').disabled=!S.planner.latestSnapshot;}
+};
 
 /* =====================================================================
    MAIN CYCLE
@@ -1651,7 +1703,7 @@ const UI = {
     const parts = [
       ['chips', () => this.renderChips(all)], ['table', () => this.renderTable()], ['radar', () => { Radar.setData(all); $('#radarInfo').textContent = `${all.length} blips · sweep ${Radar.reduce ? 'off' : 'on'}`; }],
       ['funnel', () => this.renderFunnel(all)], ['hist', () => this.renderHist(all)], ['heat', () => this.renderHeat(all)],
-      ['scatter', () => this.drawScatter(all)], ['tape', () => this.renderTape()], ['snap', () => this.renderSnap()]
+      ['scatter', () => this.drawScatter(all)], ['tape', () => this.renderTape()], ['snap', () => this.renderSnap()], ['planner', () => Planner.render()]
     ];
     for (const [n, fn] of parts) { try { fn(); } catch (e) { Log.add('ERROR', 'UI', 'RENDER', `live/${n}: ${e.message}`, e.stack); } }
   },
@@ -2125,6 +2177,7 @@ Object.assign(UI, {
       if (el.matches('[data-rs]')) { const r = Research.get(el.dataset.id); if (!r) return; const f = el.dataset.rs; r[f] = f === 'track' ? el.checked : el.value; if (f === 'track' && r.track && !S.tokens.has(r.key)) S.tokens.set(r.key, newToken(r.key, r.chain, r.address)); persist(true); if (f === 'status' || f === 'track') { el.blur(); this.renderResearch(true); } return; }
       if (el.matches('[data-err-src]')) { S.errFilter.source = el.value; this.renderErrors(); return; }
       if (el.id === 'impFile' && el.files[0]) this.importBackup(el.files[0]);
+      if (el.id === 'ppAnalystFile' && el.files[0]) Planner.importAnalyst(el.files[0]);
     });
     document.addEventListener('keydown', e => {
       if (e.key === 'Enter' && e.target.matches('[data-note-for]')) { e.preventDefault(); this.addNote(e.target.dataset.noteFor); }
@@ -2143,6 +2196,11 @@ Object.assign(UI, {
       case 'scan': if (S.scanning) toast('Сканирането вече върви…'); else cycle(); break;
       case 'pause': S.paused = !S.paused; this.renderHeader(); Radar.kick(); toast(S.paused ? 'PAUSED — данните не се обновяват' : 'RESUMED'); break;
       case 'dec': S.filter.dec = el.dataset.v; this.renderLive(); break;
+      case 'pp-analyst': { const f=$('#ppAnalystFile'); if(f) f.click(); break; }
+      case 'pp-clear-analyst': Planner.clear(); break;
+      case 'pp-build': Planner.build(); break;
+      case 'pp-lock': Planner.lock(); break;
+      case 'pp-export': Planner.exportLatest(); break;
       case 'paper': {
         if (!t || !t.m) return;
         if (S.paper.open.some(p => p.key === t.key)) { toast('Вече има отворена позиция'); return; }
