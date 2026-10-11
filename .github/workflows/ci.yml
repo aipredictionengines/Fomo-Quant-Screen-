@@ -12,3 +12,4 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/planner-smoke.mjs
+      - run: node tests/derivatives-shadow.mjs
