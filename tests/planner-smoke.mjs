@@ -16,3 +16,5 @@ for(const js of scripts)new Function(js);
 if((html.match(/<\/body>/g)||[]).length!==1)throw new Error('Unexpected body count');
 if((html.match(/<\/script>/g)||[]).length!==1)throw new Error('Unexpected script count');
 console.log('Planner smoke PASS');
+
+await import('./planner-paper-ready.mjs');
