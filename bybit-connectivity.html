@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>FOMO · Bybit Connectivity Test</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b1020;color:#e6edf7}
+    *{box-sizing:border-box}
+    body{margin:0;padding:30px 16px} main{max-width:680px;margin:auto}
+    h1{font-size:clamp(23px,5vw,34px);margin:8px 0} h2{font-size:18px;margin:16px 0 7px}
+    p{line-height:1.6;color:#b1c1d5} small{color:#91a3ba}
+    a{color:#7edcff}
+    .card{border:1px solid #33415b;background:#131c2e;border-radius:15px;padding:18px;margin:18px 0}
+    .eyebrow{letter-spacing:.09em;font-size:12px;color:#7edcff;font-weight:700}
+    .row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    button{background:#2dd49d;color:#06171a;font-weight:800;border:0;border-radius:10px;padding:14px 18px;cursor:pointer;font-size:16px}
+    button:disabled{opacity:.6;cursor:wait}
+    button.secondary{background:#283c56;color:#dfeafb;font-weight:600}
+    #state{margin-top:12px;font-size:17px;font-weight:750;white-space:normal}
+    .ok{color:#38d89b}.bad{color:#ff8597}.wait{color:#ffc46a}
+    .grid{display:grid;gap:8px;margin:14px 0}
+    .result{border:1px solid #27374e;padding:12px;border-radius:9px;display:flex;justify-content:space-between;gap:10px}
+    .result span{font-weight:650;word-break:break-word}
+    .result b{font-size:14px;text-align:right}
+    pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;border:1px solid #27374e;border-radius:10px;background:#090e1b;color:#c1d6ec;font-size:12px;max-height:300px;overflow:auto}
+    .note{font-size:13px}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">PROOF & SIGNAL · FOMO QUANT SCREEN</div>
+  <h1>Bybit API — проверка с един бутон</h1>
+  <p>Няма нужда от F12, Console, API ключ или регистрация. Този тест проверява дали <b>точно тази GitHub Pages страница</b> може да зарежда публични Bybit данни от браузъра.</p>
+  <section class="card">
+    <div class="row"><button id="start" type="button">TEST BYBIT</button><button id="copy" type="button" class="secondary" disabled>КОПИРАЙ РЕЗУЛТАТА</button></div>
+    <div id="state" class="wait" role="status" aria-live="polite">Готов за проверка. Натисни TEST BYBIT.</div>
+    <div class="grid" id="checks" aria-live="polite"></div>
+    <h2>Резултат за изпращане</h2>
+    <pre id="log">Още няма резултат.</pre>
+  </section>
+  <p class="note">Тестът прави пет публични GET заявки: Instruments, Tickers, Open Interest, Funding и Long/Short account ratio. <b>Нищо не се записва в FOMO, PAPER 50 или GitHub.</b> При грешка <code>Failed to fetch</code> причината може да е CORS, мрежа или регионално ограничение — не я определяме автоматично.</p>
+  <p class="note">При проблем с бутона можеш да отвориш <a href="https://api.bybit.com/v5/market/tickers?category=linear&amp;symbol=BTCUSDT" target="_blank" rel="noreferrer noopener">директния Bybit тест</a>. Той доказва различно нещо и не замества проверката от тази страница.</p>
+  <p class="note"><a href="./">← FOMO Quant Screen</a></p>
+</main>
+<script>
+(function () {
+  'use strict';
+  const endpoints = [
+    ['Instruments', 'https://api.bybit.com/v5/market/instruments-info?category=linear&symbol=BTCUSDT'],
+    ['Tickers', 'https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT'],
+    ['Open Interest', 'https://api.bybit.com/v5/market/open-interest?category=linear&symbol=BTCUSDT&intervalTime=1h&limit=2'],
+    ['Funding', 'https://api.bybit.com/v5/market/funding/history?category=linear&symbol=BTCUSDT&limit=1'],
+    ['Long/Short', 'https://api.bybit.com/v5/market/account-ratio?category=linear&symbol=BTCUSDT&period=1h&limit=1']
+  ];
+  const start = document.getElementById('start');
+  const copy = document.getElementById('copy');
+  const state = document.getElementById('state');
+  const checks = document.getElementById('checks');
+  const log = document.getElementById('log');
+  let report = '';
+  function row(name, status, detail, ok) {
+    const el = document.createElement('div');
+    el.className = 'result';
+    const left = document.createElement('span');
+    left.textContent = name;
+    const right = document.createElement('b');
+    right.className = ok ? 'ok' : 'bad';
+    right.textContent = status + (detail ? ' · ' + detail : '');
+    el.append(left,right); checks.appendChild(el);
+  }
+  async function check(name, url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(function () { controller.abort(); }, 12000);
+    try {
+      const response = await fetch(url, {method:'GET',mode:'cors',credentials:'omit',cache:'no-store',signal:controller.signal});
+      if (!response.ok) return {name:name,ok:false,status:'HTTP '+response.status};
+      const payload = await response.json();
+      if (payload.retCode !== 0 || !payload.result) return {name:name,ok:false,status:'retCode '+String(payload.retCode)};
+      const list = payload.result.list;
+      if (!Array.isArray(list) || !list.some(function (item) {return item.symbol==='BTCUSDT';})) {
+        return {name:name,ok:false,status:'Invalid BTCUSDT payload'};
+      }
+      return {name:name,ok:true,status:'PASS / retCode 0'};
+    } catch (error) {
+      let status = error.name==='AbortError' ? 'TIMEOUT' : error.name==='TypeError' ? 'NETWORK / CORS BLOCKED' : error.name;
+      return {name:name,ok:false,status:status,detail:String(error.message || '').slice(0,140)};
+    } finally {clearTimeout(timeout);}
+  }
+  start.addEventListener('click',async function () {
+    start.disabled=true;copy.disabled=true;checks.replaceChildren();
+    state.className='wait';state.textContent='Проверявам петте публични Bybit endpoints…';
+    log.textContent='Изчакване…';
+    const results = await Promise.all(endpoints.map(function (entry) {return check(entry[0],entry[1]);}));
+    results.forEach(function (r) {row(r.name,r.status,r.detail,r.ok);});
+    const passed=results.filter(function (r) {return r.ok;}).length;
+    state.className=passed===5?'ok':'bad';
+    state.textContent=passed===5?'PASS — всички 5 endpoints работят от този браузър.':'НЕПЪЛЕН ДОСТЪП — '+passed+'/5 endpoints работят.';
+    const lines=['FOMO-BYBIT-CORS-TEST v1','Origin: '+location.origin,'UTC: '+new Date().toISOString(),
+       'Result: '+passed+'/5 PASS'];
+    results.forEach(function (r) {lines.push(r.name+': '+r.status+(r.detail?' · '+r.detail:''));});
+    report=lines.join('\n');
+    log.textContent=report;
+    copy.disabled=false;start.disabled=false;
+  });
+  copy.addEventListener('click',async function () {
+    try {await navigator.clipboard.writeText(report);copy.textContent='КОПИРАНО ✓';}
+    catch (err) {copy.textContent='Маркирай текста по-долу';}
+  });
+})();
+</script>
+</body>
+</html>
