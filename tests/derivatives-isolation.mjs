@@ -22,7 +22,7 @@ assert.equal((html.match(/src="derivatives-shadow\.js"/g) || []).length, 1,
 for (const id of ['bybitShadowPanel','bybitShadowSymbol','bybitShadowRefresh','bybitShadowExport','bybitShadowStatus','bybitShadowOutput']) {
   assert.ok(html.includes('id="' + id + '"'), 'missing isolated UI element: ' + id);
 }
-assert.ok(adapter.includes('SHADOW ONLY') && adapter.includes("mode: 'SHADOW'"), 'scope must be research-only');
+assert.ok(adapter.includes('isolated read-only reference markets') && adapter.includes("mode: 'SHADOW'"), 'scope must be research-only');
 assert.ok(!/\b(?:localStorage|sessionStorage|indexedDB)\b/i.test(adapter), 'derivatives adapter must not write PAPER persistence');
 assert.ok(!/\/v5\/(?:order|position)\b/i.test(adapter), 'derivatives adapter must not use private order/position APIs');
 new Function(scripts[0]);
