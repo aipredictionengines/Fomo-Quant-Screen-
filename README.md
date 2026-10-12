@@ -242,3 +242,19 @@ Risk Gate is not bypassable inside the Planner: WATCH/REJECT can be previewed bu
 5. Verify REJECT/WATCH cannot lock snapshots.
 6. Verify snapshot export and persistence after reload.
 7. Only after these checks promote the integration from RC to stable PAPER use.
+
+## Derivatives Intelligence — Bybit reference markets (FOMO-DERIVATIVES-001)
+
+**SHADOW ONLY / READ ONLY / PAPER 50 LOCKED.** An optional card beside Position Planner shows reference data for explicitly selected **BTCUSDT, ETHUSDT or SOLUSDT USDT perpetual** contracts on Bybit. It never infers a perpetual instrument from the DEX token ticker, mint address, or token's chain, and never calls or changes the Quant scoring, Position Planner, execution Risk Gate, or PAPER 50 journal.
+
+- Click **REFRESH** to request public Bybit V5 endpoints. No registration, Bybit account, credentials or GitHub secret is required for these public market endpoints. There is no automatic polling.
+- The adapter verifies instrument identity (LinearPerpetual, Trading, USDT quoted and settled), exact symbol, provider timestamps and endpoint response code. Missing/stale/malformed values are shown as **N/A / PARTIAL / UNAVAILABLE**, not zero. If your browser, ISP, region, or Bybit blocks CORS, the UI reports unavailable; **the standalone 5/5 browser-origin connectivity test passed on 2026-10-12; full card UI validation remains required**. No unsafe open proxy or API-key exposure is used as a workaround.
+- Shows current indicative funding from tickers, most recent settled funding separately, 1h historical OI change, ticker OI value, mark price, and **account-holder** long/short ratios (not open-position size). Source timestamps remain visible.
+- **EXPORT JSON** saves a research-only reference snapshot including source/provenance. Data is never written automatically into historical PAPER 50 records or existing scoring objects. No endpoint is used for trading or placing orders.
+- No claim of signal improvement until independently validated with properly timestamped, out-of-sample outcomes. The initial 3 instruments are reference markets only. Future DEX token links require explicit chain/contract-to-exchange mapping and separate approval.
+
+**Contract tests:** node tests/derivatives-shadow.mjs; UI smoke: node tests/planner-smoke.mjs.
+**Live browser acceptance gate:** The separate [one-click connectivity diagnostic](https://proofandsignal.github.io/Fomo-Quant-Screen-/bybit-connectivity.html) returned 5/5 PASS from the GitHub Pages origin on 2026-10-12. Before merging this draft PR, test the same adapter in the isolated [read-only Bybit Shadow UI preview](https://proofandsignal.github.io/Fomo-Quant-Screen-/bybit-shadow-preview.html), check BTC/ETH/SOL statuses, data provenance and research JSON export, and record the actual browser result. The preview is not integrated into the primary radar or PAPER 50.
+
+
+**Official docs:** https://bybit-exchange.github.io/docs/v5/market/instrument · https://bybit-exchange.github.io/docs/v5/market/tickers · https://bybit-exchange.github.io/docs/v5/market/open-interest · https://bybit-exchange.github.io/docs/v5/market/history-fund-rate · https://bybit-exchange.github.io/docs/v5/market/long-short-ratio

@@ -351,6 +351,25 @@ footer{padding:10px 12px 18px;color:var(--dim);font-size:10.5px;border-top:1px s
           </div>
           <div id="ppOut" class="sect"><div class="empty">Signal → Analyst validation → Position Planner → Calculator → Risk Gate → Paper Snapshot.</div></div>
         </div>
+        <div class="panel" id="bybitShadowPanel">
+          <div class="ph"><i>◆</i> DERIVATIVES INTELLIGENCE <span class="r">BYBIT · SHADOW ONLY</span></div>
+          <div class="pb">
+            <div class="mini" style="margin-bottom:8px">Independent exchange reference market. NOT matched to selected DEX token; NO score, Risk Gate or PAPER 50 effects.</div>
+            <div class="toolbar">
+              <label class="mini" for="bybitShadowSymbol">USDT perpetual</label>
+              <select id="bybitShadowSymbol" aria-label="Verified reference market">
+                <option value="BTCUSDT">BTCUSDT</option>
+                <option value="ETHUSDT">ETHUSDT</option>
+                <option value="SOLUSDT">SOLUSDT</option>
+              </select>
+              <button class="btn" id="bybitShadowRefresh" type="button">REFRESH</button>
+              <button class="btn vi" id="bybitShadowExport" type="button" disabled>EXPORT JSON</button>
+            </div>
+            <div id="bybitShadowStatus" class="mini" role="status" aria-live="polite">NOT LOADED</div>
+            <div id="bybitShadowOutput" style="margin-top:8px"></div>
+            <div class="mini" style="margin-top:6px">No API key. Manual refresh. Browser CORS or regional access can block the feed; unavailable values remain N/A. Funding and long/short accounts are not forecasts.</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -2275,5 +2294,6 @@ async function boot() {
 boot();
 
 </script>
+<script src="derivatives-shadow.js" defer></script>
 </body>
 </html>
