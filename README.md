@@ -6,7 +6,7 @@
 
 > **Radar Score ≠ Coin Quality.** Pump сигналът и изпълнимостта се мерят отделно. Затова е възможно "PUMP DETECTED · EXECUTION REJECT".
 
-Статичен `index.html` с vanilla JS плюс отделен read-only `derivatives-shadow.js`; без build стъпка и външни JS библиотеки. Шрифтовете идват от Google Fonts, с fallback към системен monospace.
+Един файл, `index.html`: HTML + CSS + vanilla JS, без build стъпка и без зависимости. Шрифтовете идват от Google Fonts, с fallback към системен monospace.
 
 ---
 
@@ -243,13 +243,12 @@ Risk Gate is not bypassable inside the Planner: WATCH/REJECT can be previewed bu
 6. Verify snapshot export and persistence after reload.
 7. Only after these checks promote the integration from RC to stable PAPER use.
 
-
 ## Derivatives Intelligence — Bybit reference markets (FOMO-DERIVATIVES-001)
 
 **SHADOW ONLY / READ ONLY / PAPER 50 LOCKED.** An optional card beside Position Planner shows reference data for explicitly selected **BTCUSDT, ETHUSDT or SOLUSDT USDT perpetual** contracts on Bybit. It never infers a perpetual instrument from the DEX token ticker, mint address, or token's chain, and never calls or changes the Quant scoring, Position Planner, execution Risk Gate, or PAPER 50 journal.
 
 - Click **REFRESH** to request public Bybit V5 endpoints. No registration, Bybit account, credentials or GitHub secret is required for these public market endpoints. There is no automatic polling.
-- The adapter verifies instrument identity (LinearPerpetual, Trading, USDT quoted and settled), exact symbol, provider timestamps and endpoint response code. Missing/stale/malformed values are shown as **N/A / PARTIAL / UNAVAILABLE**, not zero. If your browser, ISP, region, or Bybit blocks CORS, the UI reports unavailable; **a confirmed browser/CORS deployment test is still required before production use**. No unsafe open proxy or API-key exposure is used as a workaround.
+- The adapter verifies instrument identity (LinearPerpetual, Trading, USDT quoted and settled), exact symbol, provider timestamps and endpoint response code. Missing/stale/malformed values are shown as **N/A / PARTIAL / UNAVAILABLE**, not zero. If your browser, ISP, region, or Bybit blocks CORS, the UI reports unavailable; **the standalone 5/5 browser-origin connectivity test passed on 2026-10-12; full card UI validation remains required**. No unsafe open proxy or API-key exposure is used as a workaround.
 - Shows current indicative funding from tickers, most recent settled funding separately, 1h historical OI change, ticker OI value, mark price, and **account-holder** long/short ratios (not open-position size). Source timestamps remain visible.
 - **EXPORT JSON** saves a research-only reference snapshot including source/provenance. Data is never written automatically into historical PAPER 50 records or existing scoring objects. No endpoint is used for trading or placing orders.
 - No claim of signal improvement until independently validated with properly timestamped, out-of-sample outcomes. The initial 3 instruments are reference markets only. Future DEX token links require explicit chain/contract-to-exchange mapping and separate approval.
