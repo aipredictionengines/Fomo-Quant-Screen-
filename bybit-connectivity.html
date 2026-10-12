@@ -70,6 +70,22 @@
     right.textContent = status + (detail ? ' · ' + detail : '');
     el.append(left,right); checks.appendChild(el);
   }
+  // Bybit Open Interest supplies symbol/category at result level, not on each list item.
+  // Every other endpoint here returns symbol per item. Validate schema, not ticker-shaped assumptions.
+  function validatePayload(name, payload) {
+    const result = payload && payload.result;
+    if (!payload || payload.retCode !== 0 || !result || !Array.isArray(result.list) || !result.list.length) return false;
+    if (name === 'Open Interest') {
+      return result.symbol === 'BTCUSDT' && result.category === 'linear' &&
+        result.list.every(function (item) {
+          const oi = item && item.openInterest;
+          const ts = item && item.timestamp;
+          return oi != null && oi !== '' && Number.isFinite(Number(oi)) && Number(oi) >= 0 &&
+            ts != null && ts !== '' && Number.isFinite(Number(ts)) && Number(ts) >= 1577836800000;
+        });
+    }
+    return result.list.some(function (item) {return item && item.symbol === 'BTCUSDT';});
+  }
   async function check(name, url) {
     const controller = new AbortController();
     const timeout = setTimeout(function () { controller.abort(); }, 12000);
@@ -78,9 +94,8 @@
       if (!response.ok) return {name:name,ok:false,status:'HTTP '+response.status};
       const payload = await response.json();
       if (payload.retCode !== 0 || !payload.result) return {name:name,ok:false,status:'retCode '+String(payload.retCode)};
-      const list = payload.result.list;
-      if (!Array.isArray(list) || !list.some(function (item) {return item.symbol==='BTCUSDT';})) {
-        return {name:name,ok:false,status:'Invalid BTCUSDT payload'};
+      if (!validatePayload(name, payload)) {
+        return {name:name,ok:false,status:'Invalid '+name+' payload'};
       }
       return {name:name,ok:true,status:'PASS / retCode 0'};
     } catch (error) {
@@ -97,7 +112,7 @@
     const passed=results.filter(function (r) {return r.ok;}).length;
     state.className=passed===5?'ok':'bad';
     state.textContent=passed===5?'PASS — всички 5 endpoints работят от този браузър.':'НЕПЪЛЕН ДОСТЪП — '+passed+'/5 endpoints работят.';
-    const lines=['FOMO-BYBIT-CORS-TEST v1','Origin: '+location.origin,'UTC: '+new Date().toISOString(),
+    const lines=['FOMO-BYBIT-CORS-TEST v1.1','Origin: '+location.origin,'UTC: '+new Date().toISOString(),
        'Result: '+passed+'/5 PASS'];
     results.forEach(function (r) {lines.push(r.name+': '+r.status+(r.detail?' · '+r.detail:''));});
     report=lines.join('\n');
