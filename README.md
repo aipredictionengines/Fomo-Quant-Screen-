@@ -254,5 +254,7 @@ Risk Gate is not bypassable inside the Planner: WATCH/REJECT can be previewed bu
 - No claim of signal improvement until independently validated with properly timestamped, out-of-sample outcomes. The initial 3 instruments are reference markets only. Future DEX token links require explicit chain/contract-to-exchange mapping and separate approval.
 
 **Contract tests:** node tests/derivatives-shadow.mjs; UI smoke: node tests/planner-smoke.mjs.
+**Live browser acceptance gate:** The separate [one-click connectivity diagnostic](https://proofandsignal.github.io/Fomo-Quant-Screen-/bybit-connectivity.html) returned 5/5 PASS from the GitHub Pages origin on 2026-10-12. Before merging this draft PR, test the same adapter in the isolated [read-only Bybit Shadow UI preview](https://proofandsignal.github.io/Fomo-Quant-Screen-/bybit-shadow-preview.html), check BTC/ETH/SOL statuses, data provenance and research JSON export, and record the actual browser result. The preview is not integrated into the primary radar or PAPER 50.
+
 
 **Official docs:** https://bybit-exchange.github.io/docs/v5/market/instrument · https://bybit-exchange.github.io/docs/v5/market/tickers · https://bybit-exchange.github.io/docs/v5/market/open-interest · https://bybit-exchange.github.io/docs/v5/market/history-fund-rate · https://bybit-exchange.github.io/docs/v5/market/long-short-ratio
