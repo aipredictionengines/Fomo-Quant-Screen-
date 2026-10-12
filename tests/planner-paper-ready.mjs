@@ -31,6 +31,7 @@ const token={
 };
 S.tokens.set(token.key,token);
 
+const downloads=[];
 const sandbox={
   S,
   CFG:{
@@ -46,7 +47,7 @@ const sandbox={
   toast:()=>{},
   Log:{add:()=>{}},
   persist:()=>{},
-  download:()=>{},
+  download:(name,body)=>downloads.push({name,body}),
   VERSION:'0.3.3-test',
   TextEncoder,
   crypto:webcrypto,
@@ -111,6 +112,14 @@ S.planner.analyst=null;
 S.planner.analystExtract=null;
 S.planner.analystKey=null;
 assert.equal(P.gate(token).status,'WATCH','missing Analyst must not become ALLOW PAPER');
+P.build();
+assert.equal(S.planner.plan.decision,'WATCH','missing Analyst preview should remain WATCH');
+P.exportCurrent();
+assert.equal(downloads.length,1,'WATCH plan must export evidence JSON');
+const watchExport=JSON.parse(downloads[0].body);
+assert.equal(watchExport.status,'UNLOCKED_PLAN_EVIDENCE');
+assert.equal(watchExport.immutable,false);
+assert.equal(watchExport.positionPlan.decision,'WATCH');
 
 S.planner.plan={token:{key:token.key},decision:'WATCH'};
 await P.lock();
