@@ -108,6 +108,7 @@ plan=S.planner.plan;
 assert.equal(plan.decision,'REJECT','execution cost that consumes risk budget must reject');
 assert.ok(plan.gate.reasons.includes('risk budget too small for structural stop'));
 
+sandbox.slip=originalSlip;
 S.planner.analyst=null;
 S.planner.analystExtract=null;
 S.planner.analystKey=null;
